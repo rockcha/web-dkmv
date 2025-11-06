@@ -1,3 +1,4 @@
+// src/pages/ExtensionDemo.tsx
 import { useMemo, useState, useRef } from "react";
 import {
   Select,
@@ -6,7 +7,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
 import { ExtensionLikePanel } from "@/components/ExtensionLikePanel";
 import {
   MOCK_ANALYSES,
@@ -41,6 +41,49 @@ function hash(s: string) {
 }
 
 type DemoResult = MockAnalysis & { elapsedMs?: number };
+
+/** ✅ 분석 전 기본 패널용 Placeholder 생성 */
+function makePlaceholderAnalysis(model: string): DemoResult {
+  return {
+    id: "placeholder",
+    title: "분석 준비됨 — 코드를 입력하고 분석을 실행하세요",
+    model: model as any,
+    detectionConfidence: 0,
+    aspect_scores: {
+      functionality: 0,
+      reliability: 0,
+      usability: 0,
+      efficiency: 0,
+      maintainability: 0,
+      portability: 0,
+      security: 0,
+    },
+    average_score: 0,
+    summaries: {
+      functionality: "기능 요구사항 충족 여부와 주요 동작 일관성을 점검합니다.",
+      reliability: "오류 발생 빈도, 실패 대응(예외/재시도) 기준을 확인합니다.",
+      usability: "UI/UX의 직관성, 접근성, 학습 용이성을 검토합니다.",
+      efficiency: "연산/메모리/네트워크 등 자원 사용을 최적화할 여지를 봅니다.",
+      maintainability:
+        "복잡도, 모듈화, 테스트 용이성 등 변경 친화성을 확인합니다.",
+      portability:
+        "환경 의존성 최소화 및 다양한 플랫폼 전환 가능성을 살핍니다.",
+      security: "민감정보 노출, 입력 검증, 취약 API 사용 여부를 점검합니다.",
+    },
+    comments: {
+      functionality:
+        "핵심 시나리오의 에지 케이스(빈 값, null 등)를 테스트에 포함하세요.",
+      reliability: "비동기 실패 처리와 백오프/재시도 정책을 명시하세요.",
+      usability: "피드백(로딩/에러/성공)을 UI에 통일된 패턴으로 제공하세요.",
+      efficiency: "중복 계산/IO는 캐시/배치 처리로 최적화하세요.",
+      maintainability: "모듈 경계를 명확히 하고 공통 유틸을 분리하세요.",
+      portability: "환경변수/경로 처리는 추상화 계층 뒤에서 관리하세요.",
+      security:
+        "입력 스키마 검증(zod/joi)과 비밀키 관리(.env)를 철저히 하세요.",
+    },
+    elapsedMs: undefined,
+  };
+}
 
 export default function ExtensionDemo() {
   const [prompt, setPrompt] = useState("");
@@ -133,6 +176,9 @@ export default function ExtensionDemo() {
     setResult(picked);
   }
 
+  // ✅ 결과가 없을 때도 기본 패널(점수 0 + 기본 설명) 표시
+  const panelData: DemoResult = result ?? makePlaceholderAnalysis(model);
+
   const RightPanel = (
     <div className="relative">
       {/* 옵션 바 */}
@@ -176,17 +222,8 @@ export default function ExtensionDemo() {
         </div>
       </div>
 
-      {/* 결과 */}
-      {result ? (
-        <ExtensionLikePanel data={result} />
-      ) : (
-        <Card className="m-4 border-[#2a2a2a] bg-[#1e1e1e]">
-          <CardContent className="py-10 text-center text-sm text-[#9aa0a6]">
-            좌측 에디터에 내용을 입력하고 <b>Ctrl/Cmd + Enter</b> 또는 상단{" "}
-            <b>분석</b> 버튼을 눌러 결과를 확인하세요.
-          </CardContent>
-        </Card>
-      )}
+      {/* ✅ 결과(없어도 placeholder로 렌더) */}
+      <ExtensionLikePanel data={panelData} />
 
       {/* 분석 오버레이 */}
       <AnalyzingOverlay
@@ -207,7 +244,7 @@ export default function ExtensionDemo() {
         </div>
       )}
 
-      {/* 오른쪽 하단 /landing 이동 버튼 + 툴팁 */}
+      {/* 오른쪽 하단 / (랜딩) 이동 버튼 + 툴팁 */}
       <TooltipProvider delayDuration={150}>
         <Tooltip>
           <TooltipTrigger asChild>

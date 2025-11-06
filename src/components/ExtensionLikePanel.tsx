@@ -20,6 +20,7 @@ import {
 // 아이콘 보라색(공통)
 const ICON_PURPLE = "#C586C0";
 
+// 라벨/아이콘 매핑 (프로그래스바는 통일된 탁한 하늘색)
 const ASPECT_META: Record<
   AspectKey,
   { label: string; Icon: React.ComponentType<any> }
@@ -84,7 +85,7 @@ export function ExtensionLikePanel({ data }: Props) {
             <span className="ml-1 font-medium">{elapsedText}</span>
           </Badge>
 
-          {/* 원래 분석 타이틀은 우측에 보조 텍스트로 */}
+          {/* 분석 타이틀(선택 코드명 등) */}
           <span className="ml-auto truncate text-xs text-[#9aa0a6]">
             {title}
           </span>
@@ -119,7 +120,7 @@ export function ExtensionLikePanel({ data }: Props) {
                   <span className="text-sm tabular-nums">{score}</span>
                 </div>
 
-                {/* 프로그레스바: 탁한 하늘색으로 통일 */}
+                {/* 프로그레스바: 탁한 하늘색으로 통일 (Tailwind JIT 위해 리터럴 사용) */}
                 <Progress
                   value={score}
                   className="bg-[#242424] [&>div]:bg-[#7FB7E6]"
