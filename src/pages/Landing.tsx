@@ -60,12 +60,16 @@ export default function Landing() {
             cursorStyle="underscore"
           />
 
-          <div className="mt-8 flex items-center justify-center gap-3">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg">
               <Link to="/dashboard">샘플 분석 확인하러 가기</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
               <a href="#about">회원가입 하러가기</a>
+            </Button>
+            {/* ✅ 익스텐션 맛보기 버튼 추가 */}
+            <Button asChild size="lg" variant="secondary">
+              <Link to="/extension-demo">익스텐션 맛보기</Link>
             </Button>
           </div>
         </div>
