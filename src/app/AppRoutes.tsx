@@ -3,6 +3,7 @@ import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./AppLayout";
 import ExtensionDemo from "@/pages/ExtensionDemo";
+import ReviewsPage from "@/pages/ReviewsPage";
 
 /** 페이지 Lazy 로드 */
 const Landing = lazy(() => import("@/pages/Landing"));
@@ -14,7 +15,7 @@ const Trends = lazy(() => import("@/pages/Trends"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const Playground = lazy(() => import("@/pages/Playground"));
 const Reports = lazy(() => import("@/pages/Reports"));
-const Settings = lazy(() => import("@/pages/Settings"));
+// const Settings = lazy(() => import("@/pages/Settings"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 
 export default function AppRoutes() {
@@ -34,7 +35,7 @@ export default function AppRoutes() {
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings" element={<ReviewsPage />} />
         </Route>
 
         {/* 레거시/잘못된 경로 처리 */}
