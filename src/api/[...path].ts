@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const resp = await fetch(targetUrl, { method, headers, body });
-
+    res.setHeader("x-proxy-target", targetUrl);
     // 백엔드 응답 헤더 복사(전송에 문제될 수 있는 건 제외)
     resp.headers.forEach((val, key) => {
       if (!["transfer-encoding"].includes(key.toLowerCase())) {
