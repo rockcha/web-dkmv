@@ -11,4 +11,15 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+
+  server: {
+    proxy: {
+      // /api/* -> http://localhost:8002/*
+      "/api": {
+        target: "http://localhost:8002",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""), // 백엔드가 /review 라면 유지
+      },
+    },
+  },
 });
