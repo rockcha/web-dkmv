@@ -1,7 +1,7 @@
 // /api/[...path].ts
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const TARGET = process.env.TARGET_API || "http://18.205.229.159:8000";
+const TARGET = process.env.TARGET_API || "http://18.205.229.159:8002";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
