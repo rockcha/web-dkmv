@@ -18,21 +18,21 @@ export async function fetchReviews(
   const payload = {
     meta: {
       version: "v1" as const,
-      ts: new Date().toISOString(), // Swagger: ts
+      ts: new Date().toISOString(),
       correlation_id: `web-${Math.random().toString(36).slice(2)}`,
       actor: "web-dashboard",
     },
     request: {
       user_id: 0,
       filters: {
-        // language: "python", // 필요하면 여기
+        // language: "python",
       },
       page,
     },
   };
 
-  const res = await fetch("/api/v1/reviews", {
-    method: "POST", // 👈 브라우저에는 POST
+  const res = await fetch("/api/reviews", {
+    method: "POST", // 브라우저 -> Vercel 함수
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -59,7 +59,6 @@ export async function fetchReviews(
     );
   }
 
-  // Swagger 응답 예시: { meta: {...}, response: { items: [...] } }
   const items = data?.response?.items;
   if (!Array.isArray(items)) {
     console.warn("[fetchReviews] unexpected response shape", data);
