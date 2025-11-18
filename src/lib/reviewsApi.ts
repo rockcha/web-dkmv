@@ -1,49 +1,72 @@
 // src/lib/reviewsApi.ts
-// ===== 필요 시 여기만 바꾸세요 =====
-const LIST_PATH = "/v1/reviews"; // 또는 "/reviews"
-const CREATE_PATH = "/v1/reviews/request"; // 생성은 계속 쓰실 거면 유지
 
-// 배포: 상대경로(/api) 사용, 로컬 DEV: 배포 도메인 직접 호출(프록시 경유)
-const API_BASE = import.meta.env.DEV
-  ? "https://web-dkmv.vercel.app.vercel.app/api"
-  : "/api";
+export type ReviewItem = {
+  review_id: number;
+  global_score: number;
+  model_score: number;
+  efficiency_index?: number;
+  summary?: string;
+  trigger?: string;
+  status?: string;
+  created_at?: string;
+};
 
-// === 조회(인증 불필요 버전) ===
-export async function fetchReviews(limit = 50) {
-  // <-- base를 명시해야 Invalid URL 안 납니다
-  const url = new URL(
-    `${API_BASE}${LIST_PATH}`,
-    typeof window !== "undefined" ? window.location.origin : "http://localhost"
-  );
-  url.searchParams.set("limit", String(limit));
+// 페이지 단위로 리뷰 목록 조회
+export async function fetchReviews(
+  page = 1,
+  token?: string
+): Promise<ReviewItem[]> {
+  const payload = {
+    meta: {
+      version: "v1" as const,
+      rts: new Date().toISOString(),
+      correlation_id: `web-${Math.random().toString(36).slice(2)}`,
+      actor: "web-dashboard",
+    },
+    request: {
+      user_id: 0, // 필요하면 실제 유저 id로 교체
+      filters: {
+        // language: "typescript", // 필터 쓰고 싶으면 여기
+      },
+      page,
+    },
+  };
 
-  const res = await fetch(url.toString(), { method: "GET" }); // 인증 필요 없으면 헤더 X
+  const res = await fetch("/api/v1/reviews", {
+    // 🔥 Swagger엔 GET이라고 표시되어 있지만
+    // 브라우저 GET은 body를 못 실으니까 프론트에서는 POST로 호출하는 게 안전함
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const text = await res.text().catch(() => "");
+
+  console.log("[fetchReviews] status:", res.status);
+  console.log("[fetchReviews] body:", text);
+
   if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`GET ${LIST_PATH} -> ${res.status}: ${t}`);
+    throw new Error(`fetchReviews failed: ${res.status} ${text}`);
   }
-  return res.json();
-}
 
-// === 생성(인증 필요할 때만 사용) ===
-export async function createReviewRaw(payload: unknown) {
-  const res = await fetch(
-    new URL(
-      `${API_BASE}${CREATE_PATH}`,
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "http://localhost"
-    ).toString(),
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" /* , ...authHeader() */ },
-      body: JSON.stringify(payload),
-      // credentials: "include", // 쿠키 인증 쓰면 활성화
-    }
-  );
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`POST ${CREATE_PATH} -> ${res.status}: ${t}`);
+  let data: any;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (e) {
+    throw new Error(
+      `fetchReviews: JSON parse error: ${(e as Error).message}\nraw=${text}`
+    );
   }
-  return res.json();
+
+  // Swagger 응답: { meta: {...}, response: { items: [...] } }
+  const items = data?.response?.items;
+  if (!Array.isArray(items)) {
+    console.warn("[fetchReviews] unexpected response shape", data);
+    return [];
+  }
+  return items;
 }

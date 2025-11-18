@@ -22,9 +22,12 @@ type ReviewItem = {
   review_id?: number;
   global_score?: number;
   model_score?: number;
-  categories?: { name: string; score: number; comment?: string }[];
+  efficiency_index?: number;
   summary?: string;
-  created_at?: string; // 서버에 없을 수도 있어 optional
+  status?: string;
+  trigger?: string;
+  created_at?: string;
+  categories?: { name: string; score: number; comment?: string }[];
 };
 
 export default function Analyses() {
@@ -32,10 +35,12 @@ export default function Analyses() {
   const [items, setItems] = React.useState<ReviewItem[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string>("");
-  const [limit, setLimit] = React.useState<number>(20);
 
-  // ===== filters (실데이터 기준 간소화) =====
-  const [q, setQ] = React.useState(""); // summary / category name 검색
+  // page 번호 (1, 2, 3, ...)
+  const [page, setPage] = React.useState<number>(1);
+
+  // ===== filters =====
+  const [q, setQ] = React.useState("");
   const [minGlobal, setMinGlobal] = React.useState<string>("__all__");
   const [minModel, setMinModel] = React.useState<string>("__all__");
 
@@ -55,14 +60,17 @@ export default function Analyses() {
     try {
       setLoading(true);
       setError("");
-      const data = await fetchReviews(limit); // GET /v1/reviews?limit=...
+
+      const token = getAuthToken() ?? undefined;
+      const data = await fetchReviews(page, token);
+
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
       setLoading(false);
     }
-  }, [limit]);
+  }, [page]);
 
   React.useEffect(() => {
     void load();
@@ -86,7 +94,7 @@ export default function Analyses() {
 
   return (
     <div className="space-y-6">
-      {/* ===== 헤더: 토큰/limit/새로고침 ===== */}
+      {/* ===== 헤더: 토큰/page/새로고침 ===== */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">
           분석 기록 (실서버)
@@ -109,15 +117,15 @@ export default function Analyses() {
             </Button>
           </div>
 
-          {/* limit + 새로고침 */}
+          {/* page + 새로고침 */}
           <div className="flex items-center gap-2 md:ml-4">
-            <span className="text-sm text-muted-foreground">limit</span>
+            <span className="text-sm text-muted-foreground">page</span>
             <Input
               className="w-24"
               type="number"
               min={1}
-              value={limit}
-              onChange={(e) => setLimit(Number(e.target.value || 20))}
+              value={page}
+              onChange={(e) => setPage(Number(e.target.value || 1))}
             />
             <Button variant="outline" onClick={load} disabled={loading}>
               {loading ? "불러오는 중…" : "새로고침"}
@@ -251,19 +259,6 @@ export default function Analyses() {
               </div>
             </div>
           ))}
-
-          {filtered.length > 0 && (
-            <div className="pt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={load}
-                disabled={loading}
-              >
-                더 불러오기(동일 limit 재호출)
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
