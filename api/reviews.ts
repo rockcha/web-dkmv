@@ -1,42 +1,72 @@
 // api/reviews.ts
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import http from "http";
+import https from "https";
+import { URL } from "url";
 
 const TARGET = process.env.TARGET_API || "http://18.205.229.159:8000";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // 프론트에서 /api/reviews?page=1 로 들어온 쿼리를 그대로 백엔드로 넘긴다
-    const qs = req.url?.includes("?")
-      ? req.url.slice(req.url.indexOf("?"))
-      : "";
+    // 프론트에서 보내온 body (이미 JSON 파싱된 상태일 가능성 높음)
+    const payload = req.body ?? {};
 
-    const targetUrl = TARGET.replace(/\/+$/, "") + "/v1/reviews" + qs;
+    const bodyStr = JSON.stringify(payload);
 
-    const headers: Record<string, string> = {};
-    for (const [k, v] of Object.entries(req.headers)) {
-      if (typeof v === "string") headers[k] = v;
+    // 타겟 URL: /v1/reviews
+    const base = TARGET.replace(/\/+$/, "");
+    const urlObj = new URL(base + "/v1/reviews");
+
+    const isHttps = urlObj.protocol === "https:";
+    const client = isHttps ? https : http;
+
+    const headers: Record<string, string> = {
+      // 백엔드에 넘길 헤더
+      "content-type": "application/json",
+      "content-length": Buffer.byteLength(bodyStr).toString(),
+    };
+
+    // Authorization 같은 헤더를 그대로 넘기고 싶다면 여기서 추가
+    if (typeof req.headers.authorization === "string") {
+      headers["authorization"] = req.headers.authorization;
     }
-    delete headers.host;
-    delete headers["content-length"];
 
-    // 🔥 백엔드에는 항상 GET, 그리고 body 없음
-    const resp = await fetch(targetUrl, {
-      method: "GET",
+    const options: http.RequestOptions = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: "GET", // 🔥 여기서 진짜로 GET + body로 보냄
       headers,
-      // body: 없음
+    };
+
+    const proxyReq = client.request(options, (proxyRes) => {
+      // 백엔드에서 온 상태코드/헤더를 그대로 클라이언트에게 전달
+      res.status(proxyRes.statusCode || 500);
+      Object.entries(proxyRes.headers).forEach(([key, val]) => {
+        if (typeof val === "string") {
+          res.setHeader(key, val);
+        }
+      });
+
+      proxyRes.pipe(res);
     });
 
-    res.setHeader("x-proxy-target", targetUrl);
-
-    resp.headers.forEach((val, key) => {
-      if (!["transfer-encoding"].includes(key.toLowerCase())) {
-        res.setHeader(key, val);
+    proxyReq.on("error", (err) => {
+      console.error("[api/reviews] proxy error:", err);
+      if (!res.headersSent) {
+        res
+          .status(500)
+          .json({ message: "Proxy error", error: String(err?.message || err) });
+      } else {
+        res.end();
       }
     });
 
-    const arrayBuf = await resp.arrayBuffer();
-    res.status(resp.status).send(Buffer.from(arrayBuf));
+    // 🔥 GET 이지만 body를 직접 써서 보낸다
+    proxyReq.write(bodyStr);
+    proxyReq.end();
   } catch (err: any) {
+    console.error("[api/reviews] handler error:", err);
     res
       .status(500)
       .json({ message: "Proxy error", error: String(err?.message || err) });
