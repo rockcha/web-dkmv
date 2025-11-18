@@ -15,30 +15,15 @@ export async function fetchReviews(
   page = 1,
   token?: string
 ): Promise<ReviewItem[]> {
-  const payload = {
-    meta: {
-      version: "v1" as const,
-      ts: new Date().toISOString(),
-      correlation_id: `web-${Math.random().toString(36).slice(2)}`,
-      actor: "web-dashboard",
-    },
-    request: {
-      user_id: 0,
-      filters: {
-        // language: "python",
-      },
-      page,
-    },
-  };
+  const qs = new URLSearchParams({ page: String(page) }).toString();
+  const url = `/api/reviews?${qs}`;
 
-  const res = await fetch("/api/reviews", {
-    method: "POST", // 브라우저 -> Vercel 함수
+  const res = await fetch(url, {
+    method: "GET",
     headers: {
-      "Content-Type": "application/json",
       Accept: "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(payload),
   });
 
   const text = await res.text().catch(() => "");

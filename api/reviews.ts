@@ -5,10 +5,13 @@ const TARGET = process.env.TARGET_API || "http://18.205.229.159:8000";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // 우리가 최종적으로 때리고 싶은 백엔드 엔드포인트
-    const targetUrl = TARGET.replace(/\/+$/, "") + "/v1/reviews";
+    // 프론트에서 /api/reviews?page=1 로 들어온 쿼리를 그대로 백엔드로 넘긴다
+    const qs = req.url?.includes("?")
+      ? req.url.slice(req.url.indexOf("?"))
+      : "";
 
-    // --- 헤더 정리 ---
+    const targetUrl = TARGET.replace(/\/+$/, "") + "/v1/reviews" + qs;
+
     const headers: Record<string, string> = {};
     for (const [k, v] of Object.entries(req.headers)) {
       if (typeof v === "string") headers[k] = v;
@@ -16,28 +19,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     delete headers.host;
     delete headers["content-length"];
 
-    // 브라우저에서는 POST로 오지만, 백엔드 스펙은 GET이므로 변환
-    const originalMethod = (req.method || "GET").toUpperCase();
-    const targetMethod = originalMethod === "POST" ? "GET" : originalMethod;
-
-    // --- body 준비 ---
-    let body: BodyInit | undefined = undefined;
-    if (targetMethod !== "HEAD") {
-      if (typeof req.body === "string" || Buffer.isBuffer(req.body)) {
-        body = req.body as any;
-      } else if (req.body && Object.keys(req.body).length > 0) {
-        headers["content-type"] = headers["content-type"] || "application/json";
-        body = JSON.stringify(req.body);
-      }
-    }
-
+    // 🔥 백엔드에는 항상 GET, 그리고 body 없음
     const resp = await fetch(targetUrl, {
-      method: targetMethod,
+      method: "GET",
       headers,
-      body,
+      // body: 없음
     });
 
-    // 디버깅용 헤더
     res.setHeader("x-proxy-target", targetUrl);
 
     resp.headers.forEach((val, key) => {
