@@ -11,7 +11,6 @@ export type ReviewItem = {
   created_at?: string;
 };
 
-// 페이지 단위로 리뷰 목록 조회
 export async function fetchReviews(
   page = 1,
   token?: string
@@ -19,23 +18,21 @@ export async function fetchReviews(
   const payload = {
     meta: {
       version: "v1" as const,
-      rts: new Date().toISOString(),
+      ts: new Date().toISOString(), // Swagger: ts
       correlation_id: `web-${Math.random().toString(36).slice(2)}`,
       actor: "web-dashboard",
     },
     request: {
-      user_id: 0, // 필요하면 실제 유저 id로 교체
+      user_id: 0,
       filters: {
-        // language: "typescript", // 필터 쓰고 싶으면 여기
+        // language: "python", // 필요하면 여기
       },
       page,
     },
   };
 
   const res = await fetch("/api/v1/reviews", {
-    // 🔥 Swagger엔 GET이라고 표시되어 있지만
-    // 브라우저 GET은 body를 못 실으니까 프론트에서는 POST로 호출하는 게 안전함
-    method: "POST",
+    method: "POST", // 👈 브라우저에는 POST
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -62,7 +59,7 @@ export async function fetchReviews(
     );
   }
 
-  // Swagger 응답: { meta: {...}, response: { items: [...] } }
+  // Swagger 응답 예시: { meta: {...}, response: { items: [...] } }
   const items = data?.response?.items;
   if (!Array.isArray(items)) {
     console.warn("[fetchReviews] unexpected response shape", data);

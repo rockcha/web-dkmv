@@ -19,19 +19,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     delete headers.host;
     delete headers["content-length"];
 
-    const method = (req.method || "GET").toUpperCase();
+    const originalMethod = (req.method || "GET").toUpperCase();
+
+    // 👇 기본은 그대로, /v1/reviews 로 오는 POST만 GET으로 변환
+    let targetMethod = originalMethod;
+    if (pathname === "/v1/reviews" && originalMethod === "POST") {
+      targetMethod = "GET";
+    }
 
     let body: BodyInit | undefined = undefined;
-    if (!["GET", "HEAD"].includes(method)) {
+
+    // 타겟 메서드 기준으로 HEAD만 body 제거
+    if (targetMethod !== "HEAD") {
       if (typeof req.body === "string" || Buffer.isBuffer(req.body)) {
         body = req.body as any;
-      } else if (req.body) {
+      } else if (req.body && Object.keys(req.body).length > 0) {
         headers["content-type"] = headers["content-type"] || "application/json";
         body = JSON.stringify(req.body);
       }
     }
 
-    const resp = await fetch(targetUrl, { method, headers, body });
+    const resp = await fetch(targetUrl, {
+      method: targetMethod,
+      headers,
+      body,
+    });
 
     res.setHeader("x-proxy-target", targetUrl);
     resp.headers.forEach((val, key) => {

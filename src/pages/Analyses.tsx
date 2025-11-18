@@ -31,20 +31,16 @@ type ReviewItem = {
 };
 
 export default function Analyses() {
-  // ===== server data =====
   const [items, setItems] = React.useState<ReviewItem[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string>("");
 
-  // page 번호 (1, 2, 3, ...)
   const [page, setPage] = React.useState<number>(1);
 
-  // ===== filters =====
   const [q, setQ] = React.useState("");
   const [minGlobal, setMinGlobal] = React.useState<string>("__all__");
   const [minModel, setMinModel] = React.useState<string>("__all__");
 
-  // ===== auth =====
   const [tokenInput, setTokenInput] = React.useState(getAuthToken() ?? "");
   const saveToken = () => {
     setAuthToken(tokenInput || "");
@@ -94,7 +90,7 @@ export default function Analyses() {
 
   return (
     <div className="space-y-6">
-      {/* ===== 헤더: 토큰/page/새로고침 ===== */}
+      {/* 헤더 */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">
           분석 기록 (실서버)
@@ -134,7 +130,7 @@ export default function Analyses() {
         </div>
       </div>
 
-      {/* ===== 필터 ===== */}
+      {/* 필터 */}
       <div className="grid gap-3 md:grid-cols-4">
         <Input
           placeholder="검색(요약/카테고리)"
@@ -171,7 +167,7 @@ export default function Analyses() {
         </Select>
       </div>
 
-      {/* ===== 리스트 ===== */}
+      {/* 리스트 */}
       <Card>
         <CardHeader>
           <CardTitle>
@@ -183,14 +179,12 @@ export default function Analyses() {
         </CardHeader>
 
         <CardContent className="text-sm">
-          {/* 에러 표시 */}
           {error && (
             <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
               {error}
             </div>
           )}
 
-          {/* 헤더 */}
           <div className="grid grid-cols-12 gap-3 pb-2 font-semibold text-slate-700 dark:text-slate-200">
             <div className="col-span-2">ID / 날짜</div>
             <div className="col-span-2">Global / Model</div>
