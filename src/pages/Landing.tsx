@@ -1,17 +1,48 @@
 // src/pages/Landing.tsx
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import {
-  Sparkles,
-  LineChart,
-  GitCompare,
-  Gauge,
-  Monitor,
-  Puzzle,
-} from "lucide-react";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Rocket, ArrowRight, Code2, Gauge, Monitor } from "lucide-react";
 import { TypingAnimation } from "@/components/ui/typing-animation";
 
+const FLOW_STEPS = [
+  {
+    id: 1,
+    label: "바이브 코딩",
+    icon: Code2,
+  },
+  {
+    id: 2,
+    label: "품질 점수화",
+    icon: Gauge,
+  },
+  {
+    id: 3,
+    label: "웹에서 확인",
+    icon: Monitor,
+  },
+];
+
+// 보라색 하이라이트 칩 공통 클래스
+const VIOLET_CHIP_CLASS =
+  "rounded-md bg-violet-500/5 px-1.5 py-0.5 " +
+  "text-violet-700 dark:text-violet-300";
+
 export default function Landing() {
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setHasLoaded(true), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const fadeClass = hasLoaded
+    ? "opacity-100 translate-y-0"
+    : "opacity-0 translate-y-4";
+
+  const currentYear = new Date().getFullYear();
+
   return (
     <main
       className="
@@ -20,202 +51,283 @@ export default function Landing() {
         dark:bg-slate-950 dark:text-slate-100
       "
     >
-      {/* Hero */}
+      {/* Hero 섹션: 왼쪽 텍스트 / 오른쪽 비디오 */}
       <section
         className="
           relative overflow-hidden
           border-b border-slate-200 dark:border-slate-800
-          bg-gradient-to-b from-slate-50 to-white
-          dark:from-slate-950 dark:to-slate-900/40
+          bg-gradient-to-b from-slate-50 via-white to-slate-50
+          dark:from-slate-950 dark:via-slate-950 dark:to-slate-900
         "
       >
-        {/* 은은한 배경 그라데이션 원 */}
+        {/* 은은한 배경 그라디언트 원 */}
         <div className="pointer-events-none absolute inset-0 -z-10 opacity-60">
-          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full blur-3xl bg-violet-300/40 dark:bg-violet-700/20" />
-          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full blur-3xl bg-cyan-300/40 dark:bg-cyan-700/20" />
+          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full blur-3xl bg-violet-300/40 dark:bg-violet-500/25" />
+          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full blur-3xl bg-cyan-300/40 dark:bg-cyan-500/20" />
         </div>
 
-        <div className="mx-auto max-w-5xl px-6 py-24 text-center">
-          {/* 제목 + 로고 */}
-          <h1
-            className="
-              mt-5 inline-flex items-center justify-center gap-3 sm:gap-4
-              text-4xl font-extrabold tracking-tight sm:text-5xl
-            "
+        <div
+          className="
+            mx-auto flex max-w-6xl lg:max-w-7xl flex-col gap-10
+            px-6 py-20
+            lg:flex-row lg:items-center lg:gap-16
+          "
+        >
+          {/* 왼쪽: 제목 / 서브카피 / 플로우 / CTA */}
+          <div
+            className={`
+              w-full lg:flex-[0.9]
+              transform-gpu transition-all duration-700 ease-out
+              ${fadeClass}
+            `}
+            style={{ transitionDelay: hasLoaded ? "0ms" : "0ms" }}
           >
-            <img
-              src="/logo.png" // /public/logo.png
-              alt="DKMV"
-              width={40}
-              height={40}
-              className="
-                h-9 w-9 sm:h-10 sm:w-10
-                rounded-md object-contain
-                ring-1 ring-slate-200/70 dark:ring-slate-800
-                shadow-sm
-              "
-              loading="eager"
-              decoding="async"
-            />
-            <span>Don’t Kill My Vibe</span>
-          </h1>
-
-          {/* 타이핑 애니메이션 — 단어 순환 */}
-          <TypingAnimation
-            as="p"
-            className="mt-3 text-lg text-slate-600 dark:text-slate-300"
-            words={[
-              "VSCode에서 한 번에: 전역·모델 점수",
-              "모델 비교로 성향 파악 (StarCoder / GPT / Claude)",
-              "시간 흐름에 따른 성장 추이와 리포트",
-            ]}
-            typeSpeed={65}
-            deleteSpeed={35}
-            pauseDelay={2000}
-            loop
-            startOnView={false}
-            showCursor
-            blinkCursor
-            cursorStyle="underscore"
-          />
-
-          {/* ✅ 데모 보러가기 — 웹/익스텐션 두 버튼 (회원가입 제거) */}
-          <div className="mt-10">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              데모 보러가기
-            </h2>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {/* 웹 UI 데모 */}
-              <Button
-                asChild
-                size="lg"
+            <div className="mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
+              {/* 제목 + 로고 + Beta 뱃지 */}
+              <h1
                 className="
-                  h-16 w-full items-center justify-center gap-3 rounded-2xl px-8 text-lg
-                  shadow-sm transition-all
-                  hover:shadow-md hover:brightness-[1.02]
+                  mt-4 inline-flex items-center justify-center gap-3 sm:gap-4
+                  text-4xl font-extrabold tracking-tight sm:text-5xl
+                  lg:justify-start
                 "
               >
-                <Link to="/dashboard" aria-label="웹 UI 데모 보러가기">
-                  <Monitor className="size-5" />웹 UI 데모 보러가기
-                </Link>
-              </Button>
+                <img
+                  src="/logo.png" // /public/logo.png
+                  alt="DKMV"
+                  width={40}
+                  height={40}
+                  className="
+                    h-9 w-9 sm:h-10 sm:w-10
+                    rounded-md object-contain
+                  "
+                  loading="eager"
+                  decoding="async"
+                />
+                <span className="flex items-center gap-2">
+                  Don’t Kill My Vibe
+                  <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/50 bg-violet-500/10 px-2 py-0.5 text-[0.65rem] font-semibold text-violet-700 dark:text-violet-200">
+                    Beta
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-violet-500" />
+                    </span>
+                  </span>
+                </span>
+              </h1>
 
-              {/* 익스텐션 UI 데모 */}
-              <Button
-                asChild
-                size="lg"
-                variant="secondary"
-                className="
-                  h-16 w-full items-center justify-center gap-3 rounded-2xl px-8 text-lg
-                  shadow-sm transition-all
-                  hover:shadow-md hover:brightness-[1.02]
-                "
+              {/* 서브카피 + 키워드 하이라이트 */}
+              <p className="mt-3 text-sm sm:text-base text-slate-600 dark:text-slate-300">
+                <span className="font-medium">AI가 만들어낸 코드</span>를{" "}
+                <span className={VIOLET_CHIP_CLASS}>정적 분석 + LLM 리뷰</span>
+                로 점수화하고,{" "}
+                <span className={VIOLET_CHIP_CLASS}>VSCode 익스텐션</span> 및{" "}
+                <span className={VIOLET_CHIP_CLASS}>웹 대시보드</span>
+                에서 한 번에 관리할 수 있는 코드 품질 시스템입니다.
+              </p>
+
+              {/* 플로우 카드 */}
+              <div
+                className={`
+                  mt-6 transform-gpu transition-all duration-700 ease-out
+                  ${fadeClass}
+                `}
+                style={{ transitionDelay: hasLoaded ? "120ms" : "0ms" }}
               >
-                <Link
-                  to="/extension-demo"
-                  aria-label="익스텐션 UI 데모 보러가기"
-                >
-                  <Puzzle className="size-5" />
-                  익스텐션 UI 데모 보러가기
-                </Link>
-              </Button>
+                <div className="grid gap-4 sm:grid-cols-3 text-left">
+                  {FLOW_STEPS.map((step, idx) => {
+                    const Icon = step.icon;
+                    return (
+                      <Card
+                        key={step.id}
+                        className="
+                          group relative flex min-h-[96px] flex-col justify-between
+                          rounded-2xl border border-violet-200/80
+                          text-xs sm:text-sm shadow-sm
+                          dark:border-violet-400/50
+                          dark:bg-slate-900/70
+                          backdrop-blur
+                          transform-gpu transition-all duration-200
+                          hover:-translate-y-1 hover:scale-[1.01] hover:shadow-lg
+                        "
+                      >
+                        <CardHeader className="flex flex-col gap-2 pb-3">
+                          <div className="flex flex-row items-center gap-1">
+                            <div
+                              className="
+                                flex h-10 w-10 items-center justify-center rounded-2xl
+                               
+                                transform-gpu transition-transform duration-200
+                                group-hover:-translate-y-0.5
+                              "
+                            >
+                              <Icon
+                                className="
+                                  size-7
+                                  text-violet-500
+                                "
+                              />
+                            </div>
+                            <div className="flex flex-col ">
+                              <CardTitle
+                                className="
+                                  text-[0.8rem] sm:text-sm
+                                  font-semibold
+                                  text-slate-800 dark:text-slate-50
+                                  whitespace-nowrap
+                                "
+                              >
+                                {step.label}
+                              </CardTitle>
+                            </div>
+                          </div>
+
+                          {/* 스텝별 짧은 설명 */}
+                          <p className="mt-1 text-[0.7rem] leading-relaxed text-slate-500 dark:text-slate-200">
+                            {idx === 0 &&
+                              "VSCode에서 평소처럼 코딩하는 순간, 바이브를 그대로 캡처합니다."}
+                            {idx === 1 &&
+                              "정적 분석 도구와 LLM이 코드 품질을 점수와 리포트로 정리합니다."}
+                            {idx === 2 &&
+                              "웹 대시보드에서 히스토리를 쌓고, 나와 팀의 성장을 한눈에 봅니다."}
+                          </p>
+                        </CardHeader>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* CTA + 타이핑 애니메이션 */}
+              <div
+                className={`
+                  mt-8 transform-gpu transition-all duration-700 ease-out
+                  ${fadeClass}
+                `}
+                style={{ transitionDelay: hasLoaded ? "220ms" : "0ms" }}
+              >
+                {/* 👉 magicui TypingAnimation 사용 */}
+                <TypingAnimation
+                  as="div"
+                  className="text-sm font-semibold tracking-wide text-violet-700 dark:text-violet-300"
+                  words={["지금, 나의 바이브 코드 점수를 확인하세요"]}
+                  typeSpeed={140}
+                  pauseDelay={2000}
+                  loop={true} // ✅ 반복
+                  startOnView={false}
+                  showCursor
+                  blinkCursor
+                  cursorStyle="underscore"
+                />
+
+                <div className="mt-4 flex justify-center lg:justify-start">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="
+                      group relative inline-flex h-16 w-full max-w-xs items-center justify-center overflow-hidden
+                      rounded-2xl border border-violet-500/70
+                      bg-gradient-to-r from-violet-500 via-violet-600 to-fuchsia-500
+                      text-base sm:text-lg font-semibold text-white
+                      shadow-[0_18px_40px_rgba(88,28,135,0.45)]
+                      transition-all duration-300
+                      hover:-translate-y-0.5 hover:scale-[1.02]
+                      hover:shadow-[0_22px_50px_rgba(88,28,135,0.7)]
+                      active:scale-[0.99]
+                    "
+                  >
+                    <Link to="/dashboard" aria-label="DKMV 대시보드 시작하기">
+                      <span className="flex items-center gap-2">
+                        <Rocket
+                          className="
+                            size-5
+                            transition-transform duration-300
+                            group-hover:-translate-y-0.5 group-hover:translate-x-0.5
+                          "
+                        />
+                        <span>시작하기</span>
+                        <ArrowRight
+                          className="
+                            size-4 opacity-0 -translate-x-1
+                            transition-all duration-300
+                            group-hover:opacity-100 group-hover:translate-x-0
+                          "
+                        />
+                      </span>
+                    </Link>
+                  </Button>
+                </div>
+              </div>
             </div>
+          </div>
 
-            {/* 보조 설명 */}
-            <p
-              className="mx-auto inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium
-                         border-slate-200 bg-white/60 text-slate-600
-                         dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
+          {/* 오른쪽: 히어로 비디오 */}
+          <div
+            className={`
+              w-full lg:flex-[1.1]
+              transform-gpu transition-all duration-700 ease-out
+              ${fadeClass}
+            `}
+            style={{ transitionDelay: hasLoaded ? "300ms" : "0ms" }}
+          >
+            <div
+              className="
+                relative overflow-hidden
+                rounded-3xl border border-slate-200/80 bg-black/90
+                shadow-xl shadow-slate-900/25
+                dark:border-slate-800
+                aspect-video
+              "
             >
-              AI 코드 품질을 점수로 재정의
-            </p>
+              {/* 비디오 상단 라벨 */}
+              <div className="absolute left-4 top-4 z-10 inline-flex items-center gap-2 rounded-lg bg-black/65 px-3 py-1 text-[0.7rem] font-medium text-slate-100">
+                <Monitor className="size-3.5" />
+                VSCode 익스텐션 실사용 화면
+              </div>
+
+              <video
+                className="h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+              >
+                {/* public/hero-video.mp4 */}
+                <source src="/extension-video.mp4" type="video/mp4" />
+                브라우저에서 HTML5 비디오를 지원하지 않습니다.
+              </video>
+
+              {/* 하단 설명 그라디언트 오버레이 */}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-4 py-4">
+                <p className="text-xs sm:text-sm text-slate-100">
+                  에디터에서 선택한 코드만 전송해{" "}
+                  <span className="font-semibold">
+                    실시간 품질 점수와 상세 피드백
+                  </span>
+                  을 받아볼 수 있습니다.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 무엇을 하는 웹? 소개 섹션 */}
-      <section id="about" className="mx-auto max-w-6xl px-6 py-6">
-        <div className="mx-auto mb-4 max-w-2xl text-center">
-          <h2 className="text-2xl font-bold">DKMV는 이런 걸 해요</h2>
-          <p className="mt-2 text-slate-600 dark:text-slate-300">
-            더미 데이터로 흐름만 먼저 보여주는 MVP 데모입니다.
-          </p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* 카드 1 */}
-          <article
-            className="rounded-2xl border bg-white/70 p-5 shadow-sm backdrop-blur
-                              border-slate-200 dark:border-slate-800
-                              dark:bg-slate-900/60"
-          >
-            <header className="mb-3 flex items-center gap-2">
-              <Gauge className="size-5 text-violet-600 dark:text-violet-400" />
-              <h3 className="font-semibold">전역/모델 점수</h3>
-            </header>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              코드 가독성·일관성·복잡도 등 항목을 점수화하고, 사용 모델을 고려한
-              모델 점수도 제공합니다.
-            </p>
-          </article>
-
-          {/* 카드 2 */}
-          <article
-            className="rounded-2xl border bg-white/70 p-5 shadow-sm backdrop-blur
-                              border-slate-200 dark:border-slate-800
-                              dark:bg-slate-900/60"
-          >
-            <header className="mb-3 flex items-center gap-2">
-              <GitCompare className="size-5 text-violet-600 dark:text-violet-400" />
-              <h3 className="font-semibold">모델 비교</h3>
-            </header>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              동일 코드로 StarCoder·GPT·Claude 성향을 비교해 어떤 모델이 어떤
-              항목에 강한지 파악합니다.
-            </p>
-          </article>
-
-          {/* 카드 3 */}
-          <article
-            className="rounded-2xl border bg-white/70 p-5 shadow-sm backdrop-blur
-                              border-slate-200 dark:border-slate-800
-                              dark:bg-slate-900/60"
-          >
-            <header className="mb-3 flex items-center gap-2">
-              <LineChart className="size-5 text-violet-600 dark:text-violet-400" />
-              <h3 className="font-semibold">성장 추이</h3>
-            </header>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              주간/월간 평균 점수와 항목별 상승률, PR/Push 비율을 시각화해
-              성장을 추적합니다.
-            </p>
-          </article>
-
-          {/* 카드 4 */}
-          <article
-            className="rounded-2xl border bg-white/70 p-5 shadow-sm backdrop-blur
-                              border-slate-200 dark:border-slate-800
-                              dark:bg-slate-900/60"
-          >
-            <header className="mb-3 flex items-center gap-2">
-              <Sparkles className="size-5 text-violet-600 dark:text-violet-400" />
-              <h3 className="font-semibold">플레이그라운드 & 리포트</h3>
-            </header>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              더미 코드로 분석을 체험하고, 발표용 리포트를 내려받는 흐름을 미리
-              확인할 수 있어요.
-            </p>
-          </article>
-        </div>
-      </section>
-
-      {/* 푸터 */}
+      {/* 푸터 확장 */}
       <footer
-        className="border-t border-slate-200 px-6 py-10 text-center text-sm text-slate-500
-                         dark:border-slate-800 dark:text-slate-400"
+        className="border-t border-slate-200 px-6 py-8 text-center text-sm text-slate-500
+                   dark:border-slate-800 dark:text-slate-400"
       >
-        © {new Date().getFullYear()} DKMV — Don’t Kill My Vibe
+        <div>© {currentYear} DKMV — Don’t Kill My Vibe</div>
+        <div className="mt-2 flex flex-wrap justify-center gap-3 text-[0.75rem] text-slate-400">
+          <span className="rounded-full border border-slate-200/70 px-3 py-1 dark:border-slate-700/70">
+            사내 PoC · 코드 품질 점수화 시스템
+          </span>
+          <span className="rounded-full border border-slate-200/70 px-3 py-1 dark:border-slate-700/70">
+            VSCode 익스텐션 · 웹 대시보드 통합
+          </span>
+          <span className="hidden rounded-full border border-slate-200/70 px-3 py-1 dark:border-slate-700/70 sm:inline">
+            문의: FE 3팀 오정록
+          </span>
+        </div>
       </footer>
     </main>
   );

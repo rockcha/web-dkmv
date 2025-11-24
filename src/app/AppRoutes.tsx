@@ -2,8 +2,6 @@
 import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./AppLayout";
-import ExtensionDemo from "@/pages/ExtensionDemo";
-// import ReviewsPage from "@/pages/ReviewsPage";
 
 /** 페이지 Lazy 로드 */
 const Landing = lazy(() => import("@/pages/Landing"));
@@ -22,8 +20,6 @@ export default function AppRoutes() {
   return (
     <Suspense fallback={<div className="p-8 text-sm">Loading…</div>}>
       <Routes>
-        {/* 랜딩은 풀스크린 단독 */}
-        <Route path="/extension-demo" element={<ExtensionDemo />} />
         {/* 공통 레이아웃(헤더/사이드바) */}
         <Route element={<AppLayout />}>
           <Route path="/" element={<Landing />} />

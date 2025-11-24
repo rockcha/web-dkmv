@@ -143,3 +143,31 @@
   animation: none;
   mix-blend-mode: normal;
 }
+
+/* 밑줄 보라빛이 지나가는 효과 */
+@keyframes header-border-sheen {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(0%);
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@layer utilities {
+  .animate-header-border-sheen {
+    animation: header-border-sheen 5s ease-in-out infinite;
+  }
+}
