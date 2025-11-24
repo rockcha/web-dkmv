@@ -292,7 +292,7 @@ export default function Landing() {
                 playsInline
               >
                 {/* public/hero-video.mp4 */}
-                <source src="/extension-video.mp4" type="video/mp4" />
+                <source src="/hero-video.mp4" type="video/mp4" />
                 브라우저에서 HTML5 비디오를 지원하지 않습니다.
               </video>
 

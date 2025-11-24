@@ -14,10 +14,20 @@ export default defineConfig({
     strictPort: true,
     // 로컬 단독 실행용 프록시(= vercel dev에서 /api는 함수가 먼저 매칭되므로 영향 없음)
     proxy: {
-      "/api": {
-        target: "http://localhost:8002",
+      // 🔐 인증 관련
+      "/auth": {
+        target: "http://18.205.229.159:8000",
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/api/, ""),
+      },
+      // 🔎 현재 로그인 유저, 기타 API
+      "/api": {
+        target: "http://18.205.229.159:8000",
+        changeOrigin: true,
+      },
+      // 📦 유저 목록 등 v1 엔드포인트
+      "/v1": {
+        target: "http://18.205.229.159:8000",
+        changeOrigin: true,
       },
     },
     // 일부 환경에서 IPv6 문제 회피

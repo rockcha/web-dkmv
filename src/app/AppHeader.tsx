@@ -1,18 +1,9 @@
 // src/layouts/AppHeader.tsx
 import { useEffect, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import { LogIn, LogOut, User2 } from "lucide-react";
+
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
+import { AuthMenu } from "@/features/auth/AuthMenu";
 
 const NAV_ITEMS = [
   { label: "홈", to: "/" },
@@ -54,7 +45,7 @@ export default function AppHeader() {
         />
       </div>
 
-      {/* 🔵 로고 (왼쪽 고정) */}
+      {/* 🔵 로고 (왼쪽 고정) — 그대로 유지 */}
       <div
         className={`
           absolute left-6 flex items-center gap-2
@@ -100,7 +91,6 @@ export default function AppHeader() {
                 "relative inline-flex items-center px-3 py-1 rounded-full transition-all select-none cursor-pointer",
                 "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
                 "hover:bg-slate-100/80 dark:hover:bg-slate-800/70",
-                // underline 애니메이션
                 "after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full",
                 "after:bg-violet-500 after:scale-x-0 after:origin-center after:transition-transform after:duration-200",
                 isActive
@@ -114,7 +104,7 @@ export default function AppHeader() {
         ))}
       </nav>
 
-      {/* 🟡 우측 액션 */}
+      {/* 🟡 우측 액션 : 다크모드 토글 + AuthMenu */}
       <div
         className={`
           absolute right-6 flex items-center gap-2
@@ -125,42 +115,8 @@ export default function AppHeader() {
       >
         <AnimatedThemeToggler className="rounded-full cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors" />
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full cursor-pointer"
-            >
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  <User2 className="size-4" />
-                </AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            align="end"
-            className="w-56 bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
-          >
-            <DropdownMenuLabel>계정</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled>
-              <User2 className="mr-2 size-4" />
-              <span>프로필 (준비중)</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled>
-              <LogIn className="mr-2 size-4" />
-              <span>로그인</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled>
-              <LogOut className="mr-2 size-4" />
-              <span>로그아웃</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* 🔐 로그인/로그아웃 토글 버튼 포함 드롭다운 */}
+        <AuthMenu />
       </div>
     </header>
   );
