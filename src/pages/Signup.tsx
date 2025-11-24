@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Github, UserPlus } from "lucide-react";
 import { startGithubLoginPopup } from "@/features/auth/authApi";
-import { useAuth } from "@/features/auth/useAuth";
+import { useAuth } from "@/features/auth/AuthContext";
 
 export default function SignupPage() {
   const navigate = useNavigate();
