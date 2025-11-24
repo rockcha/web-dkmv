@@ -1,13 +1,14 @@
 // src/routes/AppRoutes.tsx
 import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
+
 import AppLayout from "./AppLayout";
 import LoginPage from "@/pages/Login";
-import { useAuth } from "@/features/auth/useAuth";
-import GithubCallbackPage from "@/pages/GithubCallbackPage";
 import SignupPage from "@/pages/Signup";
+import GithubCallbackPage from "@/pages/GithubCallbackPage";
+import { useAuth } from "@/features/auth/useAuth";
 
-/** 페이지 Lazy 로드 */
+// Lazy Pages
 const Landing = lazy(() => import("@/pages/Landing"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Analyses = lazy(() => import("@/pages/Analyses"));
@@ -21,11 +22,9 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const PostAuthRedirect = lazy(() => import("@/pages/PostAuthRedirect"));
 
-/**
- * 로그인 필수 레이아웃
- * - 로딩 중이면 간단한 스피너/텍스트
- * - 비로그인 상태면 /login 으로 리다이렉트
- */
+/*───────────────────────────────
+  🔐 로그인 필수 보호 레이아웃
+───────────────────────────────*/
 function RequireAuthLayout() {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
@@ -51,10 +50,9 @@ function RequireAuthLayout() {
   return <Outlet />;
 }
 
-/**
- * 게스트(비로그인 사용자)만 접근 가능한 라우트
- * - 로그인되어 있으면 /dashboard 로 리다이렉트
- */
+/*───────────────────────────────
+  🟦 게스트 전용 페이지 (로그인 X)
+───────────────────────────────*/
 function GuestOnlyRoute() {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -73,6 +71,9 @@ function GuestOnlyRoute() {
   return <Outlet />;
 }
 
+/*───────────────────────────────
+  📌 전체 라우터
+───────────────────────────────*/
 export default function AppRoutes() {
   return (
     <Suspense
@@ -83,42 +84,41 @@ export default function AppRoutes() {
       }
     >
       <Routes>
-        {/* 🔐 비로그인 사용자만 접근 가능한 라우트: /login */}
-        <Route element={<GuestOnlyRoute />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-        </Route>
+        {/* 🔵 게스트 전용 라우트 */}
+        <Route element={<GuestOnlyRoute />}></Route>
 
-        {/* 🧱 공통 레이아웃 (헤더/사이드바) */}
+        {/* 🧱 공통 레이아웃 */}
         <Route element={<AppLayout />}>
-          {/* 누구나 볼 수 있는 랜딩 페이지 */}
+          {/* 공개 페이지 */}
           <Route path="/" element={<Landing />} />
-
-          {/* 이 아래는 로그인 필수 */}
           <Route path="/landing" element={<Landing />} />
           <Route path="/ui/reviews" element={<PostAuthRedirect />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          {/* 🔐 보호 라우트 */}
           <Route element={<RequireAuthLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/analyses" element={<Analyses />} />
-            <Route path="/analyses/:id" element={<AnalysisDetail />} />
-            <Route path="/compare" element={<Compare />} />
-            <Route path="/trends" element={<Trends />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/playground" element={<Playground />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/mypage/dashboard" element={<Dashboard />} />
+            <Route path="/mypage/analyses" element={<Analyses />} />
+            <Route path="/mypage/analyses/:id" element={<AnalysisDetail />} />
+            <Route path="/mypage/compare" element={<Compare />} />
+            <Route path="/mypage/trends" element={<Trends />} />
+            <Route path="/mypage/leaderboard" element={<Leaderboard />} />
+            <Route path="/mypage/playground" element={<Playground />} />
+            <Route path="/mypage/reports" element={<Reports />} />
+            <Route path="/mypage/settings" element={<Settings />} />
 
+            {/* OAuth 콜백 */}
             <Route
               path="/auth/github/callback"
               element={<GithubCallbackPage />}
             />
-
-            {/* 백엔드에서 콜백 후 보내는 경로 → 바로 landing 으로 리다이렉트 */}
           </Route>
         </Route>
 
-        {/* 레거시/잘못된 경로 처리 */}
+        {/* 레거시 처리 */}
         <Route path="/home" element={<Navigate to="/dashboard" replace />} />
+
+        {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

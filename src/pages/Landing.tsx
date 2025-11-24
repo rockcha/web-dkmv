@@ -239,7 +239,10 @@ export default function Landing() {
                       active:scale-[0.99]
                     "
                   >
-                    <Link to="/dashboard" aria-label="DKMV 대시보드 시작하기">
+                    <Link
+                      to="/mypage/dashboard"
+                      aria-label="DKMV 대시보드 시작하기"
+                    >
                       <span className="flex items-center gap-2">
                         <Rocket
                           className="
@@ -248,7 +251,7 @@ export default function Landing() {
                             group-hover:-translate-y-0.5 group-hover:translate-x-0.5
                           "
                         />
-                        <span>시작하기</span>
+                        <span>대시보드로</span>
                         <ArrowRight
                           className="
                             size-4 opacity-0 -translate-x-1
@@ -374,13 +377,29 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* 푸터 확장 */}
       <footer
-        className="border-t border-slate-200 px-6 py-8 text-center text-sm text-slate-500
-                   dark:border-slate-800 dark:text-slate-400"
+        className="
+          relative
+          border-t border-slate-200
+          px-6 py-8 text-center text-sm text-slate-500
+          dark:border-slate-800 dark:text-slate-400
+        "
       >
+        {/* 🔥 헤더와 동일한 보라 스캔 라인 (위쪽 border에 붙이기) */}
+        <div className="pointer-events-none absolute inset-x-0 -top-[2px] h-[3px] overflow-hidden">
+          <div
+            className="
+              h-full w-full
+              bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0
+              bg-[length:200%_100%]
+              animate-header-border-sheen
+            "
+          />
+        </div>
+
         <div>© {currentYear} DKMV — Don’t Kill My Vibe</div>
-        <div className="mt-2 flex flex-wrap justify-center gap-3 text-[0.75rem] text-slate-400">
+
+        <div className="mt-2 flex flex-wrap justify-center gap-3 text-[0.75rem] text-slate-400 dark:text-slate-500">
           <span className="rounded-full border border-slate-200/70 px-3 py-1 dark:border-slate-700/70">
             사내 PoC · 코드 품질 점수화 시스템
           </span>

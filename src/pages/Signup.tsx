@@ -3,9 +3,10 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, UserPlus } from "lucide-react";
+import { Github } from "lucide-react";
 import { startGithubLoginPopup } from "@/features/auth/authApi";
 import { useAuth } from "@/features/auth/AuthContext";
+import { toast } from "sonner";
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -25,11 +26,16 @@ export default function SignupPage() {
       if (e.data?.type !== "oauth:success") return;
 
       try {
-        // AuthContext가 localStorage에 저장된 토큰으로 /me 다시 호출
         await refresh();
+        toast.success("GitHub 계정이 연동되었습니다.", {
+          description: "DKMV 계정 생성이 완료되었습니다.",
+        });
         navigate("/landing", { replace: true });
       } catch (err) {
         console.error("GitHub 연동 이후 상태 갱신 실패", err);
+        toast.error("연동 상태를 불러오지 못했습니다.", {
+          description: "잠시 후 다시 시도해주세요.",
+        });
       }
     };
 
@@ -39,51 +45,90 @@ export default function SignupPage() {
 
   const handleGithubConnect = () => {
     if (isLoading) return;
-    startGithubLoginPopup("signup");
+
+    const popup = startGithubLoginPopup("signup");
+
+    if (!popup || popup.closed) {
+      toast.error("팝업을 열 수 없습니다.", {
+        description: "브라우저 팝업 차단 설정을 확인해주세요.",
+      });
+      return;
+    }
+
+    toast("GitHub 인증을 진행합니다.", {
+      description: "열린 팝업에서 GitHub 로그인을 완료해주세요.",
+    });
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-50 flex items-center justify-center px-4">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,_#22c55e_0,_#020617_55%,_#000_100%)] opacity-90" />
+    <main
+      className="
+        min-h-screen
+        flex items-center justify-center px-4
+        bg-slate-50 text-slate-900
+        dark:bg-slate-950 dark:text-slate-50
+      "
+    >
+      {/* 라이트/다크 공통 그라디언트 (로그인 페이지와 톤만 다름, 초록 포인트) */}
+      <div
+        className="
+          absolute inset-0 -z-10 opacity-90
+          bg-[radial-gradient(circle_at_top,_#6ee7b7_0,_#f8fafc_55%,_#e2e8f0_100%)]
+          dark:bg-[radial-gradient(circle_at_top,_#22c55e_0,_#020617_55%,_#000_100%)]
+        "
+      />
 
-      <Card className="w-full max-w-md border-slate-800 bg-slate-950/80 backdrop-blur">
-        <CardHeader className="space-y-2">
-          <CardTitle className="flex items-center gap-2 text-xl font-bold">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/20">
-              <UserPlus className="h-4 w-4 text-emerald-300" />
+      <Card
+        className="
+          w-full max-w-md
+          border-slate-200 bg-white/80
+          dark:border-slate-800 dark:bg-slate-950/80
+          backdrop-blur
+        "
+      >
+        <CardHeader className="space-y-4 text-center">
+          {/* 로고 + 브랜드명 */}
+          <div className="flex flex-col items-center gap-2">
+            <img
+              src="/logo.png"
+              alt="DKMV"
+              width={40}
+              height={40}
+              className="h-10 w-10 rounded-md object-contain"
+            />
+            <span className="text-[11px] tracking-[0.2em] uppercase text-slate-500 dark:text-slate-400">
+              Don&apos;t Kill My Vibe
             </span>
-            <span>DKMV 계정 생성</span>
-          </CardTitle>
-          <p className="text-sm text-slate-400">
-            DKMV 계정을 생성한 뒤 GitHub 계정을 연동하면,
-            <br />
-            코드 분석 결과를 안전하게 저장하고 조회할 수 있어요.
-          </p>
+          </div>
+          {/* 페이지 타이틀 */}
+          <CardTitle className="text-2xl font-semibold">계정 생성</CardTitle>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          {/* TODO: 여기에 닉네임/이메일 같은 추가 입력 폼 넣을 수 있음 */}
-
+        <CardContent className="space-y-6">
           <Button
             type="button"
-            className="w-full bg-emerald-600 hover:bg-emerald-500"
+            className="
+              w-full cursor-pointer
+              bg-emerald-600 hover:bg-emerald-500
+            "
             onClick={handleGithubConnect}
             disabled={isLoading}
           >
             <Github className="mr-2 h-4 w-4" />
-            GitHub 계정 연동하기
+            GitHub로 계정 만들기
           </Button>
 
-          <p className="text-xs leading-relaxed text-slate-500 text-center">
-            버튼을 누르면 GitHub 인증 팝업이 열립니다.
-            <br />
-            연동이 완료되면 이 창은 자동으로 /landing 으로 이동합니다.
-          </p>
-
-          <div className="mt-4 flex justify-between text-xs text-slate-500">
+          <div className="mt-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
             <button
               type="button"
-              className="underline-offset-2 hover:underline"
+              className="underline-offset-2 hover:underline cursor-pointer"
+              onClick={() => navigate("/")}
+            >
+              홈으로 돌아가기
+            </button>
+            <button
+              type="button"
+              className="underline-offset-2 hover:underline cursor-pointer"
               onClick={() => navigate("/login")}
             >
               이미 계정이 있으신가요? 로그인
