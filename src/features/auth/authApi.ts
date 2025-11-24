@@ -22,12 +22,30 @@ export function startGithubLoginPopup(state: string = "signup") {
   );
 }
 
+// ✅ 디버그 토큰 발급: user_id 기준으로 JWT 받아오기
+export async function mintDebugTokenByUserId(userId: number): Promise<string> {
+  const url = `${BACKEND_BASE}/auth/github/debug/mint?user_id=${userId}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error("디버그 토큰 발급 실패");
+  }
+
+  const json = await res.json();
+  const token = json?.body?.access_token;
+  if (!token) {
+    throw new Error("응답에서 access_token을 찾을 수 없습니다.");
+  }
+
+  return token as string;
+}
+
 // 로그아웃은 JWT 때는 서버쪽 처리 + 토큰 제거만 해도 됨
 export async function logoutGithub() {
   try {
     await fetch(`${BACKEND_BASE}/auth/github/logout`, {
       method: "POST",
-      credentials: "include", // 필요 없으면 빼도 됨
+      credentials: "include",
     });
   } catch (e) {
     console.error("로그아웃 요청 실패", e);

@@ -12,9 +12,11 @@ import { getToken, clearToken } from "./token";
 
 export type AuthUser = {
   id: number;
+  github_id?: string; // ✅ 추가: 백엔드 /v1/users 응답에 맞춤
   login: string;
   name?: string | null;
   avatar_url?: string | null;
+  created_at?: string;
 };
 
 type AuthContextValue = {
@@ -34,7 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchMe = useCallback(async () => {
     const token = getToken();
     if (!token) {
-      // 토큰 없으면 바로 비로그인 처리
       setUser(null);
       return;
     }
@@ -47,7 +48,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.status === 401) {
-        // 토큰 만료/무효 → 토큰 제거
         clearToken();
         setUser(null);
         return;
