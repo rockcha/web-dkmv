@@ -1,7 +1,14 @@
 // src/features/auth/AuthContext.tsx
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import type { ReactNode } from "react";
 import { logoutGithub } from "./authApi";
+import { getToken, clearToken } from "./token";
 
 export type AuthUser = {
   id: number;
@@ -24,9 +31,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchMe = async () => {
+  const fetchMe = useCallback(async () => {
+    const token = getToken();
+    if (!token) {
+      // 토큰 없으면 바로 비로그인 처리
+      setUser(null);
+      return;
+    }
+
     try {
-      const res = await fetch("/api/me", { credentials: "include" });
+      const res = await fetch("/api/v1/users/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.status === 401) {
+        // 토큰 만료/무효 → 토큰 제거
+        clearToken();
+        setUser(null);
+        return;
+      }
 
       if (!res.ok) {
         setUser(null);
@@ -39,29 +64,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("현재 로그인 정보 확인 실패", e);
       setUser(null);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    let isCancelled = false;
+
     (async () => {
       setIsLoading(true);
       await fetchMe();
-      setIsLoading(false);
+      if (!isCancelled) {
+        setIsLoading(false);
+      }
     })();
-  }, []);
 
-  const refresh = async () => {
+    return () => {
+      isCancelled = true;
+    };
+  }, [fetchMe]);
+
+  const refresh = useCallback(async () => {
     setIsLoading(true);
     await fetchMe();
     setIsLoading(false);
-  };
+  }, [fetchMe]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await logoutGithub();
     } finally {
+      clearToken();
       setUser(null);
     }
-  };
+  }, []);
 
   const value: AuthContextValue = {
     user,

@@ -1,40 +1,35 @@
 // src/features/auth/authApi.ts
+const BACKEND_BASE = "http://18.205.229.159:8000"; // TODO: 나중에 env로 빼기
 
-// GitHub 로그인 시작 (브라우저 리다이렉트)
-export function startGithubLogin(state: string = "native") {
-  // 스펙상 기본 state가 "native" 라서 기본값을 native로 뒀어.
-  const params = new URLSearchParams();
-  if (state) params.set("state", state);
-
-  // 같은 origin 기준 /auth/github/login 으로 바로 보냄
-  const url = `/auth/github/login${
-    params.toString() ? `?${params.toString()}` : ""
-  }`;
-
+// 전체 페이지 리다이렉트용 (로그인 화면에서 사용)
+export function startGithubLogin(state: string = "web-login") {
+  const url = `${BACKEND_BASE}/auth/github/login?state=${encodeURIComponent(
+    state
+  )}`;
   window.location.href = url;
 }
 
-// GitHub 로그아웃 (쿠키 삭제)
-// 실제 리다이렉트는 프론트에서 처리 (/main 또는 원하는 곳)
-export async function logoutGithub() {
-  try {
-    await fetch("/auth/github/logout", {
-      method: "POST",
-      credentials: "include",
-    });
-    // 스펙에선 303 /ui/reviews 로 리다이렉트하지만,
-    // fetch는 네비게이션을 안 바꾸니까 프론트에서 원하는 주소로 이동.
-  } catch (e) {
-    console.error("로그아웃 요청 실패", e);
-  }
-}
+// 팝업용 (회원가입 화면에서 GitHub 연동 버튼)
+export function startGithubLoginPopup(state: string = "signup") {
+  const url = `${BACKEND_BASE}/auth/github/login?state=${encodeURIComponent(
+    state
+  )}`;
 
-// 새 창(Popup)으로 GitHub OAuth 시작
-export function startGithubLoginPopup(state: string = "native") {
-  const url = `/auth/github/login?state=${state}`;
-  window.open(
+  return window.open(
     url,
     "github_oauth_popup",
     "width=500,height=650,menubar=no,toolbar=no"
   );
+}
+
+// 로그아웃은 JWT 때는 서버쪽 처리 + 토큰 제거만 해도 됨
+export async function logoutGithub() {
+  try {
+    await fetch(`${BACKEND_BASE}/auth/github/logout`, {
+      method: "POST",
+      credentials: "include", // 필요 없으면 빼도 됨
+    });
+  } catch (e) {
+    console.error("로그아웃 요청 실패", e);
+  }
 }

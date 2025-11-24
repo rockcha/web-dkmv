@@ -4,6 +4,8 @@ import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import AppLayout from "./AppLayout";
 import LoginPage from "@/pages/Login";
 import { useAuth } from "@/features/auth/useAuth";
+import GithubCallbackPage from "@/pages/GithubCallbackPage";
+import SignupPage from "@/pages/Signup";
 
 /** 페이지 Lazy 로드 */
 const Landing = lazy(() => import("@/pages/Landing"));
@@ -84,6 +86,7 @@ export default function AppRoutes() {
         {/* 🔐 비로그인 사용자만 접근 가능한 라우트: /login */}
         <Route element={<GuestOnlyRoute />}>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
         </Route>
 
         {/* 🧱 공통 레이아웃 (헤더/사이드바) */}
@@ -104,6 +107,12 @@ export default function AppRoutes() {
             <Route path="/playground" element={<Playground />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
+
+            <Route
+              path="/auth/github/callback"
+              element={<GithubCallbackPage />}
+            />
+
             {/* 백엔드에서 콜백 후 보내는 경로 → 바로 landing 으로 리다이렉트 */}
           </Route>
         </Route>

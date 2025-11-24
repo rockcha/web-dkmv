@@ -11,7 +11,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading } = useAuth();
 
-  // 이미 로그인 돼 있으면 /main 으로 보내기
+  // 이미 로그인돼 있으면 /landing으로
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
       navigate("/landing", { replace: true });
@@ -20,9 +20,8 @@ export default function LoginPage() {
 
   const handleGithubStart = () => {
     if (isLoading) return;
-    // 여기에서 실제 GitHub OAuth 시작
-    // state는 필요하면 "web", "signup" 등으로 바꿔도 됨
-    startGithubLogin("native");
+    // ✅ 로그인 전용 state
+    startGithubLogin("web-login");
   };
 
   return (
@@ -56,10 +55,9 @@ export default function LoginPage() {
           </Button>
 
           <p className="text-xs leading-relaxed text-slate-500">
-            버튼을 누르면 GitHub 로그인 페이지로 이동하고,
+            계정이 없다면 아래에서 먼저 DKMV 계정을 생성하고,
             <br />
-            인증이 완료되면 DKMV 계정이 자동으로 생성되거나, 이미 계정이 있다면
-            해당 계정으로 바로 로그인됩니다.
+            이후 GitHub 계정을 연동할 수 있어요.
           </p>
 
           <div className="mt-4 flex justify-between text-xs text-slate-500">
@@ -70,7 +68,13 @@ export default function LoginPage() {
             >
               홈으로 돌아가기
             </button>
-            <span>GitHub 계정만 있으면 바로 시작할 수 있어요.</span>
+            <button
+              type="button"
+              className="underline-offset-2 hover:underline"
+              onClick={() => navigate("/signup")}
+            >
+              계정 생성하기
+            </button>
           </div>
         </CardContent>
       </Card>

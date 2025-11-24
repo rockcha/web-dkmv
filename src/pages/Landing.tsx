@@ -31,6 +31,8 @@ const VIOLET_CHIP_CLASS =
 
 export default function Landing() {
   const [hasLoaded, setHasLoaded] = useState(false);
+  // ✅ 기본값을 idle 로
+  const [videoMode, setVideoMode] = useState<"extension" | "idle">("idle");
 
   useEffect(() => {
     const timer = setTimeout(() => setHasLoaded(true), 50);
@@ -42,6 +44,9 @@ export default function Landing() {
     : "opacity-0 translate-y-4";
 
   const currentYear = new Date().getFullYear();
+
+  const isExtensionMode = videoMode === "extension";
+  const isIdleMode = videoMode === "idle";
 
   return (
     <main
@@ -155,7 +160,6 @@ export default function Landing() {
                             <div
                               className="
                                 flex h-10 w-10 items-center justify-center rounded-2xl
-                               
                                 transform-gpu transition-transform duration-200
                                 group-hover:-translate-y-0.5
                               "
@@ -212,7 +216,7 @@ export default function Landing() {
                   words={["지금, 나의 바이브 코드 점수를 확인하세요"]}
                   typeSpeed={140}
                   pauseDelay={2000}
-                  loop={true} // ✅ 반복
+                  loop={true}
                   startOnView={false}
                   showCursor
                   blinkCursor
@@ -260,7 +264,7 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* 오른쪽: 히어로 비디오 */}
+          {/* 오른쪽: 히어로 비디오 + 보기 모드 토글 버튼 */}
           <div
             className={`
               w-full lg:flex-[1.1]
@@ -269,6 +273,51 @@ export default function Landing() {
             `}
             style={{ transitionDelay: hasLoaded ? "300ms" : "0ms" }}
           >
+            {/* 보기 모드 토글 */}
+            <div className="mb-4 flex items-center justify-end gap-3">
+              <span className="text-[0.7rem] font-medium text-violet-700 dark:text-violet-300">
+                보기 모드
+              </span>
+              <div
+                className="
+                  inline-flex items-center gap-1
+                  rounded-full border border-violet-200/80 bg-violet-50/95
+                  px-1 py-1 shadow-sm
+                  dark:border-violet-600/70 dark:bg-violet-950/70
+                "
+              >
+                <button
+                  type="button"
+                  onClick={() => setVideoMode("idle")}
+                  className={`
+                    rounded-full px-3 py-1 text-[0.8rem] font-medium
+                    transition-all duration-150 cursor-pointer
+                    ${
+                      isIdleMode
+                        ? "bg-violet-600 text-white shadow-sm dark:bg-violet-400 "
+                        : "text-violet-600/80 hover:text-violet-800 dark:text-violet-200/80 dark:hover:text-violet-50"
+                    }
+                  `}
+                >
+                  Idle 화면
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoMode("extension")}
+                  className={`
+                    rounded-full px-3 py-1 text-[0.8rem] font-medium
+                    transition-all duration-150 cursor-pointer
+                    ${
+                      isExtensionMode
+                        ? "bg-violet-600 text-white shadow-sm dark:bg-violet-400 "
+                        : "text-violet-600/80 hover:text-violet-800 dark:text-violet-200/80 dark:hover:text-violet-50"
+                    }
+                  `}
+                >
+                  VSCode 익스텐션
+                </button>
+              </div>
+            </div>
             <div
               className="
                 relative overflow-hidden
@@ -281,29 +330,43 @@ export default function Landing() {
               {/* 비디오 상단 라벨 */}
               <div className="absolute left-4 top-4 z-10 inline-flex items-center gap-2 rounded-lg bg-black/65 px-3 py-1 text-[0.7rem] font-medium text-slate-100">
                 <Monitor className="size-3.5" />
-                VSCode 익스텐션 실사용 화면
+                {isExtensionMode
+                  ? "VSCode 익스텐션 실사용 화면"
+                  : "DKMV Idle 화면"}
               </div>
 
+              {/* videoMode가 바뀔 때마다 새 video 엘리먼트로 리마운트 */}
               <video
+                key={videoMode}
                 className="h-full w-full object-cover"
                 autoPlay
                 muted
                 loop
                 playsInline
               >
-                {/* public/hero-video.mp4 */}
-                <source src="/hero-video.mp4" type="video/mp4" />
+                <source
+                  src={
+                    isExtensionMode ? "/extension-video.mp4" : "/hero-video.mp4"
+                  }
+                  type="video/mp4"
+                />
                 브라우저에서 HTML5 비디오를 지원하지 않습니다.
               </video>
 
               {/* 하단 설명 그라디언트 오버레이 */}
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-4 py-4">
                 <p className="text-xs sm:text-sm text-slate-100">
-                  에디터에서 선택한 코드만 전송해{" "}
-                  <span className="font-semibold">
-                    실시간 품질 점수와 상세 피드백
-                  </span>
-                  을 받아볼 수 있습니다.
+                  {isExtensionMode ? (
+                    <>
+                      에디터에서 선택한 코드만 전송해{" "}
+                      <span className="font-semibold">
+                        실시간 품질 점수와 상세 피드백
+                      </span>
+                      을 받아볼 수 있습니다.
+                    </>
+                  ) : (
+                    <></>
+                  )}
                 </p>
               </div>
             </div>
