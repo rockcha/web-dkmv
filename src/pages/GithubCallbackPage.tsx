@@ -10,11 +10,10 @@ export default function GithubCallbackPage() {
   const navigate = useNavigate();
   const { refresh } = useAuth();
 
-  // ✅ 이 페이지에서 콜백 로직을 한 번만 실행하기 위한 플래그
+  // ✅ 이 페이지에서 콜백 로직을 한 번만 실행하기 위한 플래그 (StrictMode 대응)
   const handledRef = useRef(false);
 
   useEffect(() => {
-    // 이미 한 번 처리했으면 더 이상 실행하지 않음 (StrictMode 대응)
     if (handledRef.current) return;
     handledRef.current = true;
 
@@ -35,7 +34,9 @@ export default function GithubCallbackPage() {
     const hasOpener = !!window.opener && !window.opener.closed;
 
     if (hasOpener) {
-      // 🧪 팝업 플로우 (회원가입) → 여기서는 status 계속 사용
+      // 🧪 팝업 플로우 (회원가입)
+      // - 토큰은 이미 같은 origin 로컬스토리지에 저장됨
+      // - 상태(status)만 부모창에 알려주고 닫기
       window.opener.postMessage(
         {
           type: "oauth:success",
@@ -50,11 +51,17 @@ export default function GithubCallbackPage() {
     // 🎯 일반 플로우 (로그인 페이지에서 전체 리다이렉트)
     (async () => {
       try {
-        await refresh();
+        const me = await refresh();
 
-        // ✅ 로그인 플로우에서는 status와 상관없이 항상 동일한 메시지
+        // ✅ 실제로 /api/v1/users/me 에서 유저 정보 못 받아오면 실패로 처리
+        if (!me) {
+          toast.error("프로필 정보를 불러오는 데 실패했습니다.");
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        // 로그인 정상 완료
         toast.success("GitHub 로그인 완료!");
-
         navigate("/landing", { replace: true });
       } catch (e) {
         console.error(e);

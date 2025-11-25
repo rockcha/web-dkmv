@@ -12,7 +12,7 @@ import { getToken, clearToken } from "./token";
 
 export type AuthUser = {
   id: number;
-  github_id?: string; // ✅ 추가: 백엔드 /v1/users 응답에 맞춤
+  github_id?: string; // ✅ 백엔드 /v1/users 응답에 맞춤
   login: string;
   name?: string | null;
   avatar_url?: string | null;
@@ -23,7 +23,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<AuthUser | null>; // ✅ 유저 또는 null 반환
   logout: () => Promise<void>;
 };
 
@@ -33,11 +33,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ✅ /api/v1/users/me 호출해서 유저 정보 가져오기
   const fetchMe = useCallback(async () => {
     const token = getToken();
     if (!token) {
       setUser(null);
-      return;
+      return null;
     }
 
     try {
@@ -48,31 +49,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.status === 401) {
+        // 토큰 만료 or 잘못된 토큰
         clearToken();
         setUser(null);
-        return;
+        return null;
       }
 
       if (!res.ok) {
+        // 그 외 에러들도 전부 로그인 안 된 상태로 간주
         setUser(null);
-        return;
+        return null;
       }
 
       const data = (await res.json()) as AuthUser;
       setUser(data);
+      return data;
     } catch (e) {
       console.error("현재 로그인 정보 확인 실패", e);
       setUser(null);
+      return null;
     }
   }, []);
 
+  // 앱 첫 로드 시 내 정보 확인
   useEffect(() => {
     let isCancelled = false;
 
     (async () => {
       setIsLoading(true);
-      await fetchMe();
+      const me = await fetchMe();
       if (!isCancelled) {
+        // me 값과 상관없이 로딩 끝
         setIsLoading(false);
       }
     })();
@@ -82,10 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchMe]);
 
+  // ✅ 외부에서 강제로 내 정보 새로고침할 때 사용
   const refresh = useCallback(async () => {
     setIsLoading(true);
-    await fetchMe();
+    const me = await fetchMe();
     setIsLoading(false);
+    return me; // 성공 시 AuthUser, 실패 시 null
   }, [fetchMe]);
 
   const logout = useCallback(async () => {
