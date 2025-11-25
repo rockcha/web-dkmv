@@ -16,53 +16,50 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/features/auth/AuthContext";
 
 const SAMPLES: Record<string, string> = {
-  ex1: `// 서비스 레이어 예제 (TS)
-export async function getUser(id: string) {
-  const res = await fetch(\`/api/users/\${id}\`);
-  if (!res.ok) throw new Error('Failed');
-  return res.json();
-}
+  ex1: `# 리스트 원소 두 배 만들기 (Python)
+arr = [1, 12, 3, 4, -5]
+arr2 = [e * 2 for e in arr]
+
+print(arr2)
+print(arr)
 `,
-  ex2: `// 리액트 훅 예제
-import { useEffect, useState } from 'react';
-export function useWindowSize() {
-  const [w, setW] = useState(window.innerWidth);
-  useEffect(() => {
-    const onR = () => setW(window.innerWidth);
-    window.addEventListener('resize', onR);
-    return () => window.removeEventListener('resize', onR);
-  }, []);
-  return w;
-}
-`,
-  ex3: `# 파이썬 스크립트
+  ex2: `# 평균 계산 함수 예제
 def calculate_average(nums):
     if not nums:
         return 0
     return sum(nums) / len(nums)
+
+print(calculate_average([1, 2, 3, 4]))
+`,
+  ex3: `# 간단한 팩토리얼 함수
+def factorial(n: int) -> int:
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
+
+print(factorial(5))
 `,
 };
 
-// 샘플별 언어/파일 경로 메타 (없으면 기본값 사용)
-const SAMPLE_META: Record<string, { language: string; file_path: string }> = {
-  ex1: { language: "typescript", file_path: "example-service.ts" },
-  ex2: { language: "typescript", file_path: "useWindowSize.ts" },
-  ex3: { language: "python", file_path: "example.py" },
-};
+// 모델 선택용 옵션 (필수는 아니지만 meta.model에 같이 넣어 줌)
+const MODEL_OPTIONS = [
+  { id: "gpt-4o-mini", label: "GPT-4o mini" },
+  { id: "starcoder-15b", label: "StarCoder 15B" },
+  { id: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
+];
 
 export default function Playground() {
-  const { user } = useAuth(); // 현재 로그인 유저
+  const { user } = useAuth();
   const [selected, setSelected] = useState<string>();
   const [code, setCode] = useState<string>("");
+
+  const [modelId, setModelId] = useState<string>(MODEL_OPTIONS[0].id);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // raw JSON 문자열
   const [requestRaw, setRequestRaw] = useState<string>("");
   const [responseRaw, setResponseRaw] = useState<string>("");
-
-  // 응답 메타 (status, url)
   const [responseInfo, setResponseInfo] = useState<string>("");
 
   const abortRef = useRef<AbortController | null>(null);
@@ -91,45 +88,40 @@ export default function Playground() {
     abortRef.current = ac;
 
     try {
-      // 언어/파일 경로 추론
-      const meta = SAMPLE_META[selected ?? ""] ?? {
-        language: "plaintext",
-        file_path: "playground.txt",
-      };
+      // ✅ 네가 보여준 예시 Request 구조 그대로 맞춘 payload
+      const nowIso = new Date().toISOString();
 
-      // 👇 리뷰 생성 요청 payload
       const payload = {
         meta: {
+          id: null, // 예시에는 0 이었지만, null도 허용 타입( integer | null )
           version: "v1",
-          ts: new Date().toISOString(),
-          correlation_id:
-            typeof crypto !== "undefined" && "randomUUID" in crypto
-              ? crypto.randomUUID()
-              : String(Date.now()),
           actor: "web-playground",
-          identity: null,
-          model: { name: "starcoder-15b" },
-          analysis: {
-            aspects: ["Bug", "Performance", "Style"],
-            total_steps: 6,
+          identity: {}, // additionalProp1 대신 빈 객체
+          model: {
+            // 예시에는 { "additionalProp1": {} } 였지만
+            // 같은 "object" 타입이므로 이렇게 name만 둬도 스키마상 OK
+            name: modelId,
           },
-          progress: { status: "pending", next_step: 1 },
-          result: null,
-          audit: null,
+          analysis: {},
+          result: {
+            result_ref: "",
+            error_message: "",
+          },
+          audit: {
+            created_at: nowIso,
+            updated_at: nowIso,
+          },
         },
         body: {
-          // 현재 로그인 유저
-          user_id: user.id,
           snippet: {
             code,
-            language: meta.language,
-            file_path: meta.file_path,
+            // ✅ language는 항상 python으로 고정
+            language: "python",
           },
-          trigger: "manual",
+          trigger: "manual", // enum 기본값
         },
       };
 
-      // 요청 JSON을 화면에 표시
       setRequestRaw(JSON.stringify(payload, null, 2));
 
       const url = "/api/v1/reviews/request";
@@ -138,8 +130,6 @@ export default function Playground() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // 필요하면 Authorization 헤더 추가 가능
-          // Authorization: `Bearer ${getToken()}`,
         },
         body: JSON.stringify(payload),
         signal: ac.signal,
@@ -149,12 +139,10 @@ export default function Playground() {
       setResponseInfo(`${resp.status} ${resp.statusText}  •  ${url}`);
 
       if (!resp.ok) {
-        // 에러 응답도 그대로 raw로 보여주기
         setResponseRaw(text || `HTTP ${resp.status}`);
         throw new Error(`HTTP ${resp.status}`);
       }
 
-      // JSON이면 예쁘게, 아니면 그냥 텍스트
       try {
         const parsed = JSON.parse(text);
         setResponseRaw(JSON.stringify(parsed, null, 2));
@@ -211,20 +199,40 @@ export default function Playground() {
             로 요청을 보내고, Request / Response Raw JSON 을 확인합니다.
           </p>
 
-          <Select onValueChange={onPick} value={selected}>
-            <SelectTrigger>
-              <SelectValue placeholder="코드 블록 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ex1">서비스 레이어 예제 (TS)</SelectItem>
-              <SelectItem value="ex2">리액트 훅 예제</SelectItem>
-              <SelectItem value="ex3">파이썬 스크립트</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* 샘플 코드 / 모델 선택 */}
+          <div className="flex flex-col gap-3 md:flex-row">
+            <div className="flex-1">
+              <Select onValueChange={onPick} value={selected}>
+                <SelectTrigger>
+                  <SelectValue placeholder="코드 블록 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ex1">배열 두 배 만들기</SelectItem>
+                  <SelectItem value="ex2">평균 계산 함수</SelectItem>
+                  <SelectItem value="ex3">팩토리얼 함수</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex-1 md:max-w-xs">
+              <Select value={modelId} onValueChange={setModelId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="모델 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MODEL_OPTIONS.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           <Textarea
             className="min-h-[220px] font-mono text-sm"
-            placeholder="여기에 코드를 붙여넣거나 샘플을 선택하세요."
+            placeholder="여기에 코드를 붙여넣거나 샘플을 선택하세요. (language는 항상 python으로 전송)"
             value={code}
             onChange={(e) => setCode(e.target.value)}
           />

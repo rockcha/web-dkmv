@@ -86,7 +86,8 @@ export default function AppRoutes() {
       <Routes>
         {/* 🔵 게스트 전용 라우트 */}
         <Route element={<GuestOnlyRoute />}></Route>
-
+        {/* OAuth 콜백 */}
+        <Route path="/auth/github/callback" element={<GithubCallbackPage />} />
         {/* 🧱 공통 레이아웃 */}
         <Route element={<AppLayout />}>
           {/* 공개 페이지 */}
@@ -107,11 +108,6 @@ export default function AppRoutes() {
             <Route path="/mypage/reports" element={<Reports />} />
             <Route path="/mypage/settings" element={<Settings />} />
           </Route>
-          {/* OAuth 콜백 */}
-          <Route
-            path="/auth/github/callback"
-            element={<GithubCallbackPage />}
-          />
         </Route>
 
         {/* 레거시 처리 */}

@@ -396,7 +396,7 @@ export default function LoginPage() {
                   "
                   onClick={() => navigate("/signup")}
                 >
-                  처음이신가요?
+                  처음이신가요? 계정 연동하기
                 </Button>
               </div>
             </section>
