@@ -12,6 +12,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/features/auth/AuthContext";
 
 const SAMPLES: Record<string, string> = {
@@ -50,7 +51,7 @@ const SAMPLE_META: Record<string, { language: string; file_path: string }> = {
 };
 
 export default function Playground() {
-  const { user } = useAuth(); // user_id 넣어주기
+  const { user } = useAuth(); // 현재 로그인 유저
   const [selected, setSelected] = useState<string>();
   const [code, setCode] = useState<string>("");
 
@@ -61,6 +62,9 @@ export default function Playground() {
   const [requestRaw, setRequestRaw] = useState<string>("");
   const [responseRaw, setResponseRaw] = useState<string>("");
 
+  // 응답 메타 (status, url)
+  const [responseInfo, setResponseInfo] = useState<string>("");
+
   const abortRef = useRef<AbortController | null>(null);
 
   const onPick = (val: string) => {
@@ -68,13 +72,20 @@ export default function Playground() {
     setCode(SAMPLES[val] ?? "");
   };
 
-  const canRun = code.trim().length > 0 && !loading;
+  const canRun = code.trim().length > 0 && !loading && !!user;
 
   const run = async () => {
     setError(null);
     setResponseRaw("");
     setRequestRaw("");
+    setResponseInfo("");
     setLoading(true);
+
+    if (!user) {
+      setError("로그인이 되어 있지 않습니다. 먼저 로그인해 주세요.");
+      setLoading(false);
+      return;
+    }
 
     const ac = new AbortController();
     abortRef.current = ac;
@@ -86,6 +97,7 @@ export default function Playground() {
         file_path: "playground.txt",
       };
 
+      // 👇 리뷰 생성 요청 payload
       const payload = {
         meta: {
           version: "v1",
@@ -106,8 +118,8 @@ export default function Playground() {
           audit: null,
         },
         body: {
-          // 현재 로그인 유저를 그대로 사용 (없으면 0)
-          user_id: user?.id ?? 0,
+          // 현재 로그인 유저
+          user_id: user.id,
           snippet: {
             code,
             language: meta.language,
@@ -120,11 +132,13 @@ export default function Playground() {
       // 요청 JSON을 화면에 표시
       setRequestRaw(JSON.stringify(payload, null, 2));
 
-      const resp = await fetch("/api/v1/reviews/request", {
+      const url = "/api/v1/reviews/request";
+
+      const resp = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // 토큰 인증이 필요하면 여기에서 Authorization 헤더 추가
+          // 필요하면 Authorization 헤더 추가 가능
           // Authorization: `Bearer ${getToken()}`,
         },
         body: JSON.stringify(payload),
@@ -132,6 +146,7 @@ export default function Playground() {
       });
 
       const text = await resp.text();
+      setResponseInfo(`${resp.status} ${resp.statusText}  •  ${url}`);
 
       if (!resp.ok) {
         // 에러 응답도 그대로 raw로 보여주기
@@ -167,12 +182,33 @@ export default function Playground() {
       {/* 입력 카드 */}
       <Card>
         <CardHeader>
-          <CardTitle>리뷰 생성 요청 (Playground)</CardTitle>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <CardTitle>리뷰 생성 요청 Playground</CardTitle>
+
+            <div className="flex items-center gap-2 text-xs md:text-sm">
+              {user ? (
+                <>
+                  <span className="text-muted-foreground">현재 사용자</span>
+                  <Badge variant="secondary">
+                    id: {user.id} · {user.login ?? "unknown"}
+                  </Badge>
+                </>
+              ) : (
+                <Badge variant="destructive">
+                  로그인되어 있지 않습니다. (요청 버튼 비활성화)
+                </Badge>
+              )}
+            </div>
+          </div>
         </CardHeader>
+
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            샘플 코드를 선택하거나 직접 코드를 입력한 뒤,{" "}
-            <b>/v1/reviews/request</b> 로 요청을 보내 raw 응답을 확인합니다.
+            샘플 코드를 선택하거나 직접 코드를 입력한 뒤{" "}
+            <code className="rounded bg-slate-900/40 px-1.5 py-0.5 text-xs">
+              POST /v1/reviews/request
+            </code>{" "}
+            로 요청을 보내고, Request / Response Raw JSON 을 확인합니다.
           </p>
 
           <Select onValueChange={onPick} value={selected}>
@@ -193,13 +229,19 @@ export default function Playground() {
             onChange={(e) => setCode(e.target.value)}
           />
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button disabled={!canRun} onClick={run}>
               {loading ? "리뷰 생성 중..." : "리뷰 생성 요청 보내기"}
             </Button>
             <Button variant="secondary" disabled={!loading} onClick={stop}>
               중단
             </Button>
+
+            {!user && (
+              <span className="text-xs text-red-400">
+                * 로그인 후에만 요청을 보낼 수 있습니다.
+              </span>
+            )}
           </div>
 
           {error && (
@@ -225,7 +267,14 @@ export default function Playground() {
           </div>
 
           <div className="space-y-2">
-            <div className="text-sm font-medium">Response Body</div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-medium">Response Body</div>
+              {responseInfo && (
+                <span className="text-[11px] text-muted-foreground">
+                  {responseInfo}
+                </span>
+              )}
+            </div>
             <Textarea
               className="min-h-[260px] font-mono text-xs"
               value={responseRaw}
