@@ -6,7 +6,7 @@ import AppLayout from "./AppLayout";
 import LoginPage from "@/pages/Login";
 import SignupPage from "@/pages/Signup";
 import GithubCallbackPage from "@/pages/GithubCallbackPage";
-import { useAuth } from "@/features/auth/useAuth";
+import { useAuth } from "@/features/auth/AuthContext";
 
 // Lazy Pages
 const Landing = lazy(() => import("@/pages/Landing"));
@@ -65,7 +65,7 @@ function GuestOnlyRoute() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/mypage/dashboard" replace />;
   }
 
   return <Outlet />;
@@ -116,7 +116,10 @@ export default function AppRoutes() {
         </Route>
 
         {/* 레거시 처리 */}
-        <Route path="/home" element={<Navigate to="/dashboard" replace />} />
+        <Route
+          path="/home"
+          element={<Navigate to="/mypage/dashboard" replace />}
+        />
 
         {/* 404 */}
         <Route path="*" element={<NotFound />} />

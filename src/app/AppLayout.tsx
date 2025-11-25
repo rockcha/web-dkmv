@@ -150,7 +150,7 @@ export default function AppLayout() {
               </aside>
 
               {/* ========== 메인 컨텐츠 ========== */}
-              <main>
+              <main className="py-6 ">
                 <PageHeader pathname={pathname} />
                 <section aria-live="polite">
                   <Outlet />

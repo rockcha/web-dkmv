@@ -23,7 +23,7 @@ export function AuthMenu({ className }: AuthMenuProps) {
 
     if (!isAuthenticated) {
       // 🔵 로그인되지 않은 경우: /login 이동 + 토스트
-      toast("로그인이 필요합니다.", {
+      toast.info("로그인이 필요합니다.", {
         description: "로그인 페이지로 이동합니다.",
       });
       navigate("/login");

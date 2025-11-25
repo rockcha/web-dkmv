@@ -1,20 +1,29 @@
 // src/layouts/AppHeader.tsx
 import { useEffect, useState, Fragment } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { Home, Info, DownloadCloud, LayoutDashboard } from "lucide-react";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { AuthMenu } from "@/features/auth/AuthMenu";
+import { useAuth } from "@/features/auth/AuthContext";
+import { toast } from "sonner";
 
 const NAV_ITEMS = [
   { label: "홈", to: "/", icon: Home },
   { label: "DKMV란?", to: "/about", icon: Info },
   { label: "다운로드", to: "/download", icon: DownloadCloud },
-  { label: "대시보드", to: "/mypage/dashboard", icon: LayoutDashboard }, // ✅ 추가
+  {
+    label: "대시보드",
+    to: "/mypage/dashboard",
+    icon: LayoutDashboard,
+    requiresAuth: true as const, // ✅ 로그인 필요
+  },
 ];
 
 export default function AppHeader() {
   const [mounted, setMounted] = useState(false);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 30);
@@ -102,12 +111,24 @@ export default function AppHeader() {
 
               <NavLink
                 to={item.to}
+                onClick={(e) => {
+                  // ✅ 대시보드 등 보호된 메뉴 접근 시 가드
+                  if (item.requiresAuth && !isAuthenticated) {
+                    e.preventDefault();
+
+                    // sonner 경고 토스트
+                    toast.warning("로그인 후 이용 가능한 메뉴입니다.");
+
+                    // 원하면 로그인/회원가입 페이지로 보내기
+                    navigate("/login");
+                    return;
+                  }
+                }}
                 className={({ isActive }) =>
                   [
-                    "group relative inline-flex items-center px-2 py-1 rounded-full transition-all select-none cursor-pointer",
+                    "group relative inline-flex items-center p-2 rounded-md transition-all select-none cursor-pointer",
                     "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
                     "hover:bg-slate-100/80 dark:hover:bg-slate-800/70",
-                    // underline
                     "after:absolute after:inset-x-2 after:-bottom-1 after:h-0.5 after:rounded-full",
                     "after:bg-violet-500 after:scale-x-0 after:origin-center after:transition-transform after:duration-200",
                     isActive
@@ -154,7 +175,7 @@ export default function AppHeader() {
         `}
         style={{ transitionDelay: mounted ? "160ms" : "0ms" }}
       >
-        <AnimatedThemeToggler className="rounded-full cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors" />
+        <AnimatedThemeToggler className=" cursor-pointer transition-transform duration-200 ease-out hover:scale-115" />
         <AuthMenu />
       </div>
     </header>
