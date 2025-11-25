@@ -77,9 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       setIsLoading(true);
-      const me = await fetchMe();
+      await fetchMe(); // ← 변수 없이 그냥 await만
       if (!isCancelled) {
-        // me 값과 상관없이 로딩 끝
         setIsLoading(false);
       }
     })();
