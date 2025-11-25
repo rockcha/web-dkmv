@@ -1,5 +1,5 @@
 // src/pages/Signup.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -14,6 +14,9 @@ export default function SignupPage() {
 
   // ✅ 순차 등장 애니메이션용
   const [mounted, setMounted] = useState(false);
+
+  // ✅ oauth:success 한 번만 처리 (React StrictMode 이펙트 2번 방지)
+  const handledRef = useRef(false);
 
   // 이미 로그인 돼 있으면 바로 /landing
   useEffect(() => {
@@ -34,11 +37,27 @@ export default function SignupPage() {
       if (e.origin !== window.location.origin) return;
       if (e.data?.type !== "oauth:success") return;
 
+      // ✅ 이미 처리했다면 무시 (StrictMode 대응)
+      if (handledRef.current) return;
+      handledRef.current = true;
+
+      const status = (e.data as { status?: string }).status ?? "new";
+
       try {
         await refresh();
-        toast.success("GitHub 계정이 연동되었습니다.", {
-          description: "DKMV 계정 생성이 완료되었습니다.",
-        });
+
+        if (status === "existing") {
+          // 이미 연동된 계정 → 다시 가입 아니라 “자동 로그인” 안내
+          toast.info("이미 연동된 GitHub 계정입니다.", {
+            description: "해당 계정으로 자동 로그인되었어요.",
+          });
+        } else {
+          // 새로 연동된 계정 → 계정 생성 + 자동 로그인 안내
+          toast.success("GitHub 계정이 연동되었습니다.", {
+            description: "DKMV 계정 생성 후 자동 로그인되었어요.",
+          });
+        }
+
         navigate("/landing", { replace: true });
       } catch (err) {
         console.error("GitHub 연동 이후 상태 갱신 실패", err);
@@ -75,10 +94,10 @@ export default function SignupPage() {
     <main
       className="
         relative
-    mt-6
+        mt-6
         flex items-center justify-center
         px-4 sm:px-6 lg:px-8
-        bg-slate-50 text-slate-900
+        text-slate-900
         dark:bg-slate-950 dark:text-slate-50
       "
     >
@@ -92,15 +111,15 @@ export default function SignupPage() {
         "
       />
 
-      {/* ✅ 1단계: 카드 전체가 먼저 부드럽게 */}
+      {/* ✅ 카드: 보더/그림자 제거 */}
       <Card
         className={`
           w-full
           max-w-5xl
-          border-slate-200 bg-white/80
-          dark:border-slate-800 dark:bg-slate-950/80
+          border-none shadow-none
+          bg-white/80
+          dark:bg-slate-950/80
           backdrop-blur-xl
-          shadow-2xl
           rounded-2xl
           transform
           transition-all duration-500 ease-out

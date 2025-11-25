@@ -1,10 +1,13 @@
 // src/pages/Login.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Github } from "lucide-react";
-import { mintDebugTokenByUserId } from "@/features/auth/authApi";
+import { Github, Bug } from "lucide-react";
+import {
+  mintDebugTokenByUserId,
+  startGithubLogin,
+} from "@/features/auth/authApi";
 import { setToken } from "@/features/auth/token";
 import type { AuthUser } from "@/features/auth/AuthContext";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -21,6 +24,9 @@ export default function LoginPage() {
   // ✅ 순차 등장 애니메이션용
   const [mounted, setMounted] = useState(false);
 
+  // ✅ 인풋 자동 포커스용 (디버그 로그인용)
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
   // 이미 로그인돼 있으면 /landing으로
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -28,13 +34,28 @@ export default function LoginPage() {
     }
   }, [isLoading, isAuthenticated, navigate]);
 
-  // ✅ 페이지 진입 시 애니메이션 시작
+  // 페이지 진입 시 애니메이션 시작
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 40);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // 로딩 끝나고 로그인 안 된 상태면 인풋에 포커스(디버그 모드에서만 실질적으로 의미 있음)
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isLoading, isAuthenticated]);
+
+  // 🎯 실제 GitHub OAuth 로그인 (전체 페이지 리다이렉트)
+  const handleGithubLogin = () => {
+    if (isLoading) return;
+    // state는 web으로 고정해서 사용 (백에서 state="web"을 프론트 로그인 플로우로 처리)
+    startGithubLogin("web");
+  };
+
+  // 🧪 개발용: 아이디로 디버그 토큰 로그인
+  const handleDebugSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!githubLogin.trim() || isLoading || isSubmitting) return;
 
@@ -67,8 +88,8 @@ export default function LoginPage() {
       setToken(token);
       await refresh();
 
-      toast.success("로그인되었습니다.", {
-        description: `${matched.login} 님, 환영합니다.`,
+      toast.success("디버그 로그인 완료", {
+        description: `${matched.login} 님으로 로그인했습니다.`,
       });
       navigate("/landing", { replace: true });
     } catch (err) {
@@ -91,10 +112,10 @@ export default function LoginPage() {
     <main
       className="
         relative
-      m-12
+        m-12
         flex items-center justify-center
         px-4 sm:px-6 lg:px-8
-        bg-slate-50 text-slate-900
+        text-slate-900
         dark:bg-slate-950 dark:text-slate-50
       "
     >
@@ -108,15 +129,15 @@ export default function LoginPage() {
         "
       />
 
-      {/* ✅ 1단계: 카드 전체 먼저 */}
+      {/* 카드 */}
       <Card
-        className={`
+        className={` 
           w-full
           max-w-5xl
-          border-slate-200 bg-white/80
-          dark:border-slate-800 dark:bg-slate-950/80
+          border-none shadow-none
+          bg-white/80
+          dark:bg-slate-950/80
           backdrop-blur-xl
-          shadow-2xl
           rounded-2xl
           transform
           transition-all duration-500 ease-out
@@ -126,7 +147,6 @@ export default function LoginPage() {
           transitionDelay: mounted ? "0ms" : "0ms",
         }}
       >
-        {/* ✅ 2단계: 헤더 */}
         <CardHeader
           className={`
             border-b border-slate-200/70 dark:border-slate-800/70
@@ -184,7 +204,7 @@ export default function LoginPage() {
 
         <CardContent className="p-6 sm:p-8 lg:px-10 lg:py-8">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_1fr] items-stretch">
-            {/* ✅ 3단계: 왼쪽 일러스트 영역 */}
+            {/* 왼쪽 일러스트 영역 */}
             <section
               className={`
                 hidden lg:flex
@@ -211,7 +231,7 @@ export default function LoginPage() {
               </div>
             </section>
 
-            {/* ✅ 4단계: 오른쪽 로그인 영역 */}
+            {/* 오른쪽 로그인 영역 */}
             <section
               className={`
                 flex flex-col justify-center space-y-6 lg:pl-6
@@ -232,8 +252,8 @@ export default function LoginPage() {
                 </h1>
               </header>
 
-              {/* ✅ 5단계: 폼 요소 */}
-              <form
+              {/* 🎯 실제 GitHub OAuth 로그인 버튼 */}
+              <div
                 className={`
                   space-y-4
                   transition-all duration-500 ease-out
@@ -246,39 +266,9 @@ export default function LoginPage() {
                 style={{
                   transitionDelay: mounted ? "260ms" : "0ms",
                 }}
-                onSubmit={handleSubmit}
               >
-                <div className="space-y-2">
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-200">
-                    GitHub 아이디
-                  </label>
-                  <input
-                    type="text"
-                    value={githubLogin}
-                    onChange={(e) => {
-                      setGithubLogin(e.target.value);
-                      if (error) setError(null);
-                    }}
-                    placeholder="Github 계정 아이디를 입력해주세요.. "
-                    className={[
-                      "w-full rounded-lg px-3.5 py-3 text-sm sm:text-base",
-                      "bg-slate-50 text-slate-900 placeholder:text-slate-400",
-                      "border focus:outline-none",
-                      "dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500",
-                      hasError
-                        ? "border-red-500/70 focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                        : "border-slate-300 focus:ring-2 focus:ring-violet-500 focus:border-transparent dark:border-slate-700",
-                    ].join(" ")}
-                    aria-invalid={hasError}
-                  />
-                  {hasError && (
-                    <p className="mt-1 text-xs text-red-500">{error}</p>
-                  )}
-                </div>
-
-                {/* 메인 로그인 버튼 */}
                 <Button
-                  type="submit"
+                  type="button"
                   className="
                     group
                     w-full
@@ -295,14 +285,66 @@ export default function LoginPage() {
                     active:translate-y-[1px] active:scale-[0.99]
                     disabled:opacity-60 disabled:cursor-not-allowed
                   "
-                  disabled={isBusy || !githubLogin.trim()}
+                  onClick={handleGithubLogin}
+                  disabled={isLoading}
                 >
                   <Github className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
-                  {isBusy ? "로그인 중..." : "GitHub 아이디로 로그인"}
+                  GitHub로 로그인하기
                 </Button>
-              </form>
 
-              {/* ✅ 6단계: 하단 버튼들 마지막 */}
+                {/* 🧪 개발용 디버그 로그인 (접어서 숨김) */}
+                <details className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                  <summary className="flex items-center gap-1 cursor-pointer select-none">
+                    <Bug className="h-3 w-3" />
+                    개발용 디버그 로그인
+                  </summary>
+
+                  <form className="mt-3 space-y-3" onSubmit={handleDebugSubmit}>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                        GitHub 아이디
+                      </label>
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        value={githubLogin}
+                        onChange={(e) => {
+                          setGithubLogin(e.target.value);
+                          if (error) setError(null);
+                        }}
+                        placeholder="Github 계정 아이디를 입력해주세요.. "
+                        className={[
+                          "w-full rounded-lg px-3.5 py-3 text-sm sm:text-base",
+                          "bg-slate-50 text-slate-900 placeholder:text-slate-400",
+                          "border focus:outline-none",
+                          "dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500",
+                          hasError
+                            ? "border-red-500/70 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                            : "border-slate-300 focus:ring-2 focus:ring-violet-500 focus:border-transparent dark:border-slate-700",
+                        ].join(" ")}
+                        aria-invalid={hasError}
+                      />
+                      {hasError && (
+                        <p className="mt-1 text-xs text-red-500">{error}</p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      disabled={isBusy || !githubLogin.trim()}
+                    >
+                      {isBusy
+                        ? "디버그 로그인 중..."
+                        : "디버그 토큰으로 로그인"}
+                    </Button>
+                  </form>
+                </details>
+              </div>
+
+              {/* 하단 보조 버튼들 */}
               <div
                 className={`
                   mt-3 flex flex-col sm:flex-row sm:justify-between

@@ -106,13 +106,12 @@ export default function AppRoutes() {
             <Route path="/mypage/playground" element={<Playground />} />
             <Route path="/mypage/reports" element={<Reports />} />
             <Route path="/mypage/settings" element={<Settings />} />
-
-            {/* OAuth 콜백 */}
-            <Route
-              path="/auth/github/callback"
-              element={<GithubCallbackPage />}
-            />
           </Route>
+          {/* OAuth 콜백 */}
+          <Route
+            path="/auth/github/callback"
+            element={<GithubCallbackPage />}
+          />
         </Route>
 
         {/* 레거시 처리 */}

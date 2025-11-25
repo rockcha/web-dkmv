@@ -2,7 +2,14 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
-import { toast } from "sonner"; //
+import { toast } from "sonner";
+import { User } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type AuthMenuProps = {
   className?: string;
@@ -10,32 +17,15 @@ type AuthMenuProps = {
 
 export function AuthMenu({ className }: AuthMenuProps) {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, logout } = useAuth();
+  const { isAuthenticated, isLoading, logout, user } = useAuth();
 
-  const label = isLoading
-    ? "확인중..."
-    : isAuthenticated
-    ? "로그아웃"
-    : "로그인";
-
-  const handleClick = async () => {
-    if (isLoading) return;
-
-    if (!isAuthenticated) {
-      // 🔵 로그인되지 않은 경우: /login 이동 + 토스트
-      toast.info("로그인이 필요합니다.", {
-        description: "로그인 페이지로 이동합니다.",
-      });
-      navigate("/login");
-      return;
-    }
-
-    // 🔴 로그인된 경우: 로그아웃 + 토스트 + /landing
+  const handleLogout = async () => {
     try {
       await logout();
       toast.success("로그아웃 되었습니다.", {
         description: "언제든 다시 바이브 체크하러 오세요!",
       });
+      // 🔁 URL만 /landing으로 이동 (새로고침 제거)
       navigate("/landing", { replace: true });
     } catch (err) {
       console.error(err);
@@ -45,20 +35,72 @@ export function AuthMenu({ className }: AuthMenuProps) {
     }
   };
 
+  // 🔵 비로그인 상태 → 빈 계정 아이콘 + Tooltip("로그인")
+  if (!isAuthenticated) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={[
+                "cursor-pointer", // ✅ 항상 pointer
+                className,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              disabled={isLoading}
+              onClick={() => {
+                if (isLoading) return;
+                toast.info("로그인이 필요합니다.", {
+                  description: "로그인 페이지로 이동합니다.",
+                });
+                navigate("/login");
+              }}
+            >
+              <User className="h-5 w-5 text-slate-600 dark:text-slate-200" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>로그인</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  // 🔴 로그인 상태 → GitHub 아바타 + Tooltip("로그아웃")
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className={[
-        "px-3 text-sm font-medium cursor-pointer", // ✅ cursor-pointer 추가
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      disabled={isLoading}
-      onClick={handleClick}
-    >
-      {label}
-    </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={handleLogout}
+            disabled={isLoading}
+            className={`
+              h-9 w-9
+              rounded-full
+              border border-slate-300 dark:border-slate-700
+              overflow-hidden
+              hover:ring-2 hover:ring-violet-500/60
+              disabled:opacity-60
+              transition-all
+              cursor-pointer  /* ✅ 여기도 pointer 고정 */
+              ${className ?? ""}
+            `}
+          >
+            <img
+              src={user?.avatar_url || "/images/default-avatar.png"}
+              alt={user?.login || "user avatar"}
+              className="w-full h-full object-cover"
+            />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>로그아웃</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
