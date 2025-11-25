@@ -10,15 +10,92 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
-type ReviewItem = {
-  review_id?: number;
-  global_score?: number;
-  model_score?: number;
-  categories?: { name: string; score: number; comment?: string }[];
-  summary?: string;
-  created_at?: string;
+// ====== 백엔드 스키마에 맞춘 타입들 ======
+type ScoresByCategory = {
+  bug: number;
+  performance: number;
+  maintainability: number;
+  style: number;
+  docs: number;
+  dependency: number;
+  security: number;
+  testing: number;
 };
+
+type IssueSeverity = "HIGH" | "MEDIUM" | "LOW";
+
+type CategoryName =
+  | "Bug"
+  | "Performance"
+  | "Maintainability"
+  | "Style"
+  | "Docs"
+  | "Dependency"
+  | "Security"
+  | "Testing";
+
+type ReviewDetailItem = {
+  issue_id?: string | null;
+  issue_category: CategoryName;
+  issue_severity: IssueSeverity;
+  issue_summary: string;
+  issue_details?: string | null;
+  issue_line_number?: number | null;
+  issue_column_number?: number | null;
+};
+
+type ReviewCore = {
+  id: number;
+  user_id: number;
+  model: string;
+  trigger: string;
+  language?: string | null;
+
+  quality_score: number;
+  summary: string;
+
+  score_bug: number;
+  score_maintainability: number;
+  score_style: number;
+  score_security: number;
+
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ReviewWithDetails = {
+  review: ReviewCore;
+  scores_by_category: ScoresByCategory;
+  review_details: ReviewDetailItem[];
+};
+
+// 카테고리 키→라벨 맵
+const CATEGORY_LABELS: Record<keyof ScoresByCategory, string> = {
+  bug: "Bug",
+  performance: "Performance",
+  maintainability: "Maintainability",
+  style: "Style",
+  docs: "Docs",
+  dependency: "Dependency",
+  security: "Security",
+  testing: "Testing",
+};
+
+function severityColor(severity: IssueSeverity) {
+  switch (severity) {
+    case "HIGH":
+      return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200";
+    case "MEDIUM":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
+    case "LOW":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
+    default:
+      return "";
+  }
+}
 
 export default function ReviewsPage() {
   // ---- state
@@ -26,20 +103,31 @@ export default function ReviewsPage() {
   const [loading, setLoading] = React.useState(false);
   const [posting, setPosting] = React.useState(false);
   const [error, setError] = React.useState<string>("");
-  const [items, setItems] = React.useState<ReviewItem[]>([]);
+  const [items, setItems] = React.useState<ReviewWithDetails[]>([]);
   const [tokenInput, setTokenInput] = React.useState(getAuthToken() ?? "");
 
-  // 초기 예시 payload (Raw JSON)
+  // 초기 예시 payload (Raw JSON) – 백엔드 스펙에 맞게 자유롭게 수정해서 사용
   const [payload, setPayload] = React.useState<string>(
     JSON.stringify(
       {
-        global_score: 85,
-        model_score: 87,
-        categories: [
-          { name: "readability", score: 4, comment: "코드 가독성 양호" },
-          { name: "maintainability", score: 4, comment: "구조가 단순" },
-        ],
-        summary: "샘플 리뷰 요약",
+        // 예: ReviewResultRequest.record 형태 또는 LLMQualityResponse 형태 등
+        // 실제 백엔드 스펙에 맞게 수정해서 사용하면 됩니다.
+        quality_score: 85,
+        review_summary: "샘플 리뷰 요약입니다.",
+        scores_by_category: {
+          bug: 3,
+          performance: 4,
+          maintainability: 4,
+          style: 5,
+          docs: 3,
+          dependency: 4,
+          security: 4,
+          testing: 3,
+        },
+        review_details: {
+          bug: "중요한 버그는 발견되지 않았습니다.",
+          performance: "루프 최적화 여지가 약간 있습니다.",
+        },
       },
       null,
       2
@@ -52,7 +140,8 @@ export default function ReviewsPage() {
       setLoading(true);
       setError("");
       const data = await fetchReviews(limit);
-      setItems(Array.isArray(data) ? data : []);
+      // 백엔드에서 ReviewWithDetails[] 내려온다고 가정
+      setItems(Array.isArray(data) ? (data as ReviewWithDetails[]) : []);
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
@@ -103,7 +192,7 @@ export default function ReviewsPage() {
       {/* 헤더 */}
       <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Reviews (임시)
+          Reviews (임시 / v2 스키마)
         </h1>
 
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -165,8 +254,8 @@ export default function ReviewsPage() {
               {error && <span className="text-sm text-red-600">{error}</span>}
             </div>
             <p className="text-xs text-muted-foreground">
-              * 백엔드 스키마를 그대로 보냅니다. 필요한 필드를 JSON으로 자유롭게
-              편집하세요.
+              * 백엔드 스키마(예: ReviewResultRequest, LLMQualityResponse 등)에
+              맞춰 JSON을 직접 작성해서 전송하는 영역입니다.
             </p>
           </form>
         </CardContent>
@@ -198,63 +287,140 @@ export default function ReviewsPage() {
         )}
 
         <div className="space-y-4">
-          {items.map((r) => (
-            <Card
-              key={String(r.review_id ?? Math.random())}
-              className="border border-slate-200/70 dark:border-slate-800/70"
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-                  <span className="font-semibold">#{r.review_id}</span>
-                  <Separator orientation="vertical" className="h-4" />
-                  <span>
-                    Global: <b>{r.global_score ?? "-"}</b>
-                  </span>
-                  <Separator orientation="vertical" className="h-4" />
-                  <span>
-                    Model: <b>{r.model_score ?? "-"}</b>
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {r.summary && (
-                  <p className="whitespace-pre-wrap leading-relaxed">
-                    {r.summary}
-                  </p>
-                )}
+          {items.map((item) => {
+            const r = item.review;
+            const scores = item.scores_by_category;
+            const details = item.review_details;
 
-                {Array.isArray(r.categories) && r.categories.length > 0 && (
-                  <div className="rounded-lg border p-3">
-                    <div className="mb-2 font-medium">Categories</div>
-                    <ul className="space-y-1">
-                      {r.categories.map((c, i) => (
-                        <li
-                          key={i}
-                          className="flex flex-wrap items-center gap-2"
-                        >
-                          <span className="rounded bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800">
-                            {c.name}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            score: {c.score}
-                          </span>
-                          {c.comment && (
-                            <span className="text-xs">— {c.comment}</span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+            return (
+              <Card
+                key={r.id}
+                className="border border-slate-200/70 dark:border-slate-800/70"
+              >
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+                    <span className="font-semibold">#{r.id}</span>
+                    <Separator orientation="vertical" className="h-4" />
+                    <span>
+                      Quality:{" "}
+                      <b>
+                        {r.quality_score}
+                        /100
+                      </b>
+                    </span>
+                    <Separator orientation="vertical" className="h-4" />
+                    <span className="text-xs text-muted-foreground">
+                      model: {r.model}
+                    </span>
+                    <Separator orientation="vertical" className="h-4" />
+                    <span className="text-xs text-muted-foreground">
+                      trigger: {r.trigger}
+                    </span>
+                    {r.language && (
+                      <>
+                        <Separator orientation="vertical" className="h-4" />
+                        <span className="text-xs text-muted-foreground">
+                          lang: {r.language}
+                        </span>
+                      </>
+                    )}
+                    <Separator orientation="vertical" className="h-4" />
+                    <Badge
+                      variant="outline"
+                      className="text-[11px] uppercase tracking-wide"
+                    >
+                      {r.status}
+                    </Badge>
+                  </CardTitle>
+                  {r.created_at && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString()}
+                    </div>
+                  )}
+                </CardHeader>
 
-                {r.created_at && (
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(r.created_at).toLocaleString()}
+                <CardContent className="space-y-4 text-sm">
+                  {/* 요약 */}
+                  {r.summary && (
+                    <p className="whitespace-pre-wrap leading-relaxed">
+                      {r.summary}
+                    </p>
+                  )}
+
+                  {/* 카테고리별 점수 (ScoresByCategory) */}
+                  <div className="rounded-lg border border-slate-200/70 dark:border-slate-800/70 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                      Category Scores
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        Object.entries(scores) as [
+                          keyof ScoresByCategory,
+                          number
+                        ][]
+                      )
+                        .filter(([, value]) => value > 0)
+                        .map(([key, value]) => (
+                          <Badge
+                            key={key}
+                            variant="secondary"
+                            className="flex items-center gap-1 text-[11px]"
+                          >
+                            <span>{CATEGORY_LABELS[key]}</span>
+                            <span className="opacity-80">{value}/5</span>
+                          </Badge>
+                        ))}
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+
+                  {/* 이슈 상세 리스트 */}
+                  {details && details.length > 0 && (
+                    <div className="rounded-lg border border-slate-200/70 dark:border-slate-800/70 p-3">
+                      <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                        Issues
+                      </div>
+                      <div className="space-y-2">
+                        {details.map((d, idx) => (
+                          <div
+                            key={d.issue_id ?? idx}
+                            className="rounded-md bg-slate-50 p-2 text-xs dark:bg-slate-900/60"
+                          >
+                            <div className="mb-1 flex flex-wrap items-center gap-2">
+                              <Badge variant="outline" className="text-[10px]">
+                                {d.issue_category}
+                              </Badge>
+                              <span
+                                className={[
+                                  "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                  severityColor(d.issue_severity),
+                                ].join(" ")}
+                              >
+                                {d.issue_severity}
+                              </span>
+                              {typeof d.issue_line_number === "number" && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  line {d.issue_line_number}
+                                  {typeof d.issue_column_number === "number"
+                                    ? `, col ${d.issue_column_number}`
+                                    : ""}
+                                </span>
+                              )}
+                            </div>
+                            <div className="font-medium">{d.issue_summary}</div>
+                            {d.issue_details && (
+                              <div className="mt-1 text-[11px] text-muted-foreground whitespace-pre-wrap">
+                                {d.issue_details}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </section>
     </div>

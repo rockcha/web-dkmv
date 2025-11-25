@@ -3,7 +3,6 @@
 
 import * as React from "react";
 import { fetchReviews } from "@/lib/reviewsApi";
-import { getAuthToken, setAuthToken, clearAuthToken } from "@/lib/auth";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,38 +16,120 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
-type ReviewItem = {
-  review_id?: number;
-  global_score?: number;
-  model_score?: number;
-  categories?: { name: string; score: number; comment?: string }[];
-  summary?: string;
-  created_at?: string; // 서버에 없을 수도 있어 optional
+// ====== 백엔드 스키마에 맞춘 타입들 ======
+type ScoresByCategory = {
+  bug: number;
+  performance: number;
+  maintainability: number;
+  style: number;
+  docs: number;
+  dependency: number;
+  security: number;
+  testing: number;
 };
 
+type IssueSeverity = "HIGH" | "MEDIUM" | "LOW";
+
+type CategoryName =
+  | "Bug"
+  | "Performance"
+  | "Maintainability"
+  | "Style"
+  | "Docs"
+  | "Dependency"
+  | "Security"
+  | "Testing";
+
+type ReviewDetailItem = {
+  issue_id?: string | null;
+  issue_category: CategoryName;
+  issue_severity: IssueSeverity;
+  issue_summary: string;
+  issue_details?: string | null;
+  issue_line_number?: number | null;
+  issue_column_number?: number | null;
+};
+
+type ReviewCore = {
+  id: number;
+  user_id: number;
+  model: string;
+  trigger: string;
+  language?: string | null;
+
+  quality_score: number;
+  summary: string | null;
+
+  // (필요하면 score_bug 등도 쓸 수 있지만,
+  // 여기서는 scores_by_category를 메인으로 사용)
+  score_bug: number;
+  score_maintainability: number;
+  score_style: number;
+  score_security: number;
+
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ReviewWithDetails = {
+  review: ReviewCore;
+  scores_by_category: ScoresByCategory;
+  review_details: ReviewDetailItem[];
+};
+
+// 카테고리 키→라벨 맵
+const CATEGORY_LABELS: Record<keyof ScoresByCategory, string> = {
+  bug: "Bug",
+  performance: "Performance",
+  maintainability: "Maintainability",
+  style: "Style",
+  docs: "Docs",
+  dependency: "Dependency",
+  security: "Security",
+  testing: "Testing",
+};
+
+function severityColor(severity: IssueSeverity) {
+  switch (severity) {
+    case "HIGH":
+      return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200";
+    case "MEDIUM":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200";
+    case "LOW":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
+    default:
+      return "";
+  }
+}
+
 export default function Analyses() {
-  // ===== server data =====
-  const [items, setItems] = React.useState<ReviewItem[]>([]);
+  // ===== 서버 데이터 =====
+  const [items, setItems] = React.useState<ReviewWithDetails[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string>("");
   const [limit, setLimit] = React.useState<number>(20);
 
-  // ===== filters (실데이터 기준 간소화) =====
-  const [q, setQ] = React.useState(""); // summary / category name 검색
-  const [minGlobal, setMinGlobal] = React.useState<string>("__all__");
-  const [minModel, setMinModel] = React.useState<string>("__all__");
+  // ===== 필터 =====
+  const [q, setQ] = React.useState(""); // summary / issue 검색
+  const [minQuality, setMinQuality] = React.useState<string>("__all__");
+  const [languageFilter, setLanguageFilter] = React.useState<string>("__all__");
 
-  // ===== auth =====
-  const [tokenInput, setTokenInput] = React.useState(getAuthToken() ?? "");
-  const saveToken = () => {
-    setAuthToken(tokenInput || "");
-    alert("토큰 저장됨");
-  };
-  const removeToken = () => {
-    clearAuthToken();
-    setTokenInput("");
-    alert("토큰 제거됨");
+  // 카드마다 이슈를 접었다/폈다 하기 위한 상태
+  const [expandedIds, setExpandedIds] = React.useState<Set<number>>(
+    () => new Set()
+  );
+
+  const toggleExpanded = (id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const load = React.useCallback(async () => {
@@ -56,7 +137,7 @@ export default function Analyses() {
       setLoading(true);
       setError("");
       const data = await fetchReviews(limit); // GET /v1/reviews?limit=...
-      setItems(Array.isArray(data) ? data : []);
+      setItems(Array.isArray(data) ? (data as ReviewWithDetails[]) : []);
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
@@ -68,204 +149,320 @@ export default function Analyses() {
     void load();
   }, [load]);
 
+  // 필터 적용
   const filtered = React.useMemo(() => {
-    const mg = minGlobal === "__all__" ? null : Number(minGlobal);
-    const mm = minModel === "__all__" ? null : Number(minModel);
-    return items.filter((r) => {
-      if (mg != null && (r.global_score ?? -Infinity) < mg) return false;
-      if (mm != null && (r.model_score ?? -Infinity) < mm) return false;
+    const mq = minQuality === "__all__" ? null : Number(minQuality);
+
+    return items.filter((item) => {
+      const r = item.review;
+
+      if (mq != null && r.quality_score < mq) return false;
+
+      if (languageFilter !== "__all__") {
+        const lang = (r.language || "").toLowerCase();
+        if (lang !== languageFilter.toLowerCase()) return false;
+      }
 
       if (q.trim()) {
-        const cats = (r.categories ?? []).map((c) => c.name).join(" ");
-        const hay = `${r.summary ?? ""} ${cats}`.toLowerCase();
+        const summary = (r.summary ?? "").toLowerCase();
+        const issuesText = item.review_details
+          .map(
+            (d) =>
+              `${d.issue_summary ?? ""} ${d.issue_details ?? ""} ${
+                d.issue_category ?? ""
+              }`
+          )
+          .join(" ")
+          .toLowerCase();
+
+        const hay = `${summary} ${issuesText}`;
         if (!hay.includes(q.toLowerCase())) return false;
       }
+
       return true;
     });
-  }, [items, q, minGlobal, minModel]);
+  }, [items, q, minQuality, languageFilter]);
+
+  const allLanguages = React.useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((item) => {
+      if (item.review.language) {
+        set.add(item.review.language);
+      }
+    });
+    return Array.from(set);
+  }, [items]);
 
   return (
     <div className="space-y-6">
-      {/* ===== 헤더: 토큰/limit/새로고침 ===== */}
+      {/* ===== 헤더: limit / 새로고침 ===== */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          분석 기록 (실서버)
-        </h1>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">분석 기록</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            VS Code에서 보낸 코드 리뷰 내역이 여기 쌓입니다.
+          </p>
+        </div>
 
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          {/* 토큰 입력 */}
-          <div className="flex items-center gap-2">
-            <Input
-              value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="Bearer 토큰"
-              className="w-[340px]"
-            />
-            <Button variant="secondary" onClick={saveToken}>
-              저장
-            </Button>
-            <Button variant="outline" onClick={removeToken}>
-              삭제
-            </Button>
-          </div>
-
-          {/* limit + 새로고침 */}
-          <div className="flex items-center gap-2 md:ml-4">
-            <span className="text-sm text-muted-foreground">limit</span>
-            <Input
-              className="w-24"
-              type="number"
-              min={1}
-              value={limit}
-              onChange={(e) => setLimit(Number(e.target.value || 20))}
-            />
-            <Button variant="outline" onClick={load} disabled={loading}>
-              {loading ? "불러오는 중…" : "새로고침"}
-            </Button>
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">limit</span>
+          <Input
+            className="w-24"
+            type="number"
+            min={1}
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value || 20))}
+          />
+          <Button variant="outline" onClick={load} disabled={loading}>
+            {loading ? "불러오는 중…" : "새로고침"}
+          </Button>
         </div>
       </div>
 
       {/* ===== 필터 ===== */}
-      <div className="grid gap-3 md:grid-cols-4">
-        <Input
-          placeholder="검색(요약/카테고리)"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-
-        <Select value={minGlobal} onValueChange={setMinGlobal}>
-          <SelectTrigger>
-            <SelectValue placeholder="최소 Global 점수" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Global 제한 없음</SelectItem>
-            {[50, 60, 70, 80, 90].map((v) => (
-              <SelectItem key={v} value={String(v)}>
-                Global ≥ {v}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={minModel} onValueChange={setMinModel}>
-          <SelectTrigger>
-            <SelectValue placeholder="최소 Model 점수" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">Model 제한 없음</SelectItem>
-            {[50, 60, 70, 80, 90].map((v) => (
-              <SelectItem key={v} value={String(v)}>
-                Model ≥ {v}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* ===== 리스트 ===== */}
       <Card>
-        <CardHeader>
-          <CardTitle>
-            서버 리뷰 목록{" "}
-            <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
-              {filtered.length}건
-            </span>
-          </CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">필터</CardTitle>
         </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <Input
+            placeholder="요약·이슈 내용 검색"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
 
-        <CardContent className="text-sm">
-          {/* 에러 표시 */}
-          {error && (
-            <div className="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
-              {error}
-            </div>
-          )}
+          <Select value={minQuality} onValueChange={setMinQuality}>
+            <SelectTrigger>
+              <SelectValue placeholder="최소 Quality 점수" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">Quality 제한 없음</SelectItem>
+              {[50, 60, 70, 80, 90].map((v) => (
+                <SelectItem key={v} value={String(v)}>
+                  Quality ≥ {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-          {/* 헤더 */}
-          <div className="grid grid-cols-12 gap-3 pb-2 font-semibold text-slate-700 dark:text-slate-200">
-            <div className="col-span-2">ID / 날짜</div>
-            <div className="col-span-2">Global / Model</div>
-            <div className="col-span-4">요약</div>
-            <div className="col-span-4">카테고리</div>
-          </div>
-
-          {loading && (
-            <div className="py-12 text-center text-slate-500">불러오는 중…</div>
-          )}
-
-          {!loading && filtered.length === 0 && (
-            <div className="py-12 text-center text-slate-500">
-              데이터가 없습니다.
-            </div>
-          )}
-
-          {filtered.map((it) => (
-            <div
-              key={String(it.review_id ?? Math.random())}
-              className="grid grid-cols-12 gap-3 border-t border-slate-200 py-3 dark:border-slate-800"
-            >
-              <div className="col-span-2">
-                <div className="font-medium">#{it.review_id ?? "-"}</div>
-                <div className="text-xs text-slate-500">
-                  {it.created_at
-                    ? new Date(it.created_at).toLocaleString()
-                    : "-"}
-                </div>
-              </div>
-
-              <div className="col-span-2">
-                <div className="font-semibold text-violet-600 dark:text-violet-400">
-                  G {it.global_score ?? "-"}
-                </div>
-                <div className="text-xs text-slate-500">
-                  M {it.model_score ?? "-"}
-                </div>
-              </div>
-
-              <div className="col-span-4">
-                <div className="line-clamp-3 text-slate-700 dark:text-slate-300">
-                  {it.summary || (
-                    <span className="text-slate-500">요약 없음</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="col-span-4 space-y-1">
-                {(it.categories ?? []).slice(0, 4).map((c, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <Badge variant="secondary" className="shrink-0">
-                      {c.name}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      score: {c.score}
-                    </span>
-                    {c.comment && (
-                      <>
-                        <Separator orientation="vertical" className="h-3" />
-                        <span className="text-xs">{c.comment}</span>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {filtered.length > 0 && (
-            <div className="pt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={load}
-                disabled={loading}
-              >
-                더 불러오기(동일 limit 재호출)
-              </Button>
-            </div>
-          )}
+          <Select
+            value={languageFilter}
+            onValueChange={setLanguageFilter}
+            disabled={allLanguages.length === 0}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="언어 필터" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">모든 언어</SelectItem>
+              {allLanguages.map((lang) => (
+                <SelectItem key={lang} value={lang}>
+                  {lang}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
+
+      {/* ===== 리스트 ===== */}
+      <section>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-xl font-medium">내 리뷰</h2>
+          <span className="text-sm text-muted-foreground">
+            {filtered.length}건
+          </span>
+        </div>
+
+        {error && (
+          <Card className="mb-4 border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/40">
+            <CardContent className="py-3 text-sm text-red-700 dark:text-red-200">
+              {error}
+            </CardContent>
+          </Card>
+        )}
+
+        {loading && (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              불러오는 중…
+            </CardContent>
+          </Card>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              아직 분석 기록이 없습니다.
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="space-y-4">
+          {filtered.map((item) => {
+            const r = item.review;
+            const scores = item.scores_by_category;
+            const details = item.review_details;
+            const expanded = expandedIds.has(r.id);
+
+            return (
+              <Card
+                key={r.id}
+                className="border border-slate-200/70 dark:border-slate-800/70"
+              >
+                {/* 상단 요약 */}
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+                    <span className="font-semibold">#{r.id}</span>
+                    <Separator orientation="vertical" className="h-4" />
+                    <span>
+                      Quality{" "}
+                      <b>
+                        {r.quality_score}
+                        /100
+                      </b>
+                    </span>
+                    <Separator orientation="vertical" className="h-4" />
+                    <span className="text-xs text-muted-foreground">
+                      model: {r.model}
+                    </span>
+                    <Separator orientation="vertical" className="h-4" />
+                    <span className="text-xs text-muted-foreground">
+                      trigger: {r.trigger}
+                    </span>
+                    {r.language && (
+                      <>
+                        <Separator orientation="vertical" className="h-4" />
+                        <span className="text-xs text-muted-foreground">
+                          lang: {r.language}
+                        </span>
+                      </>
+                    )}
+                    <Separator orientation="vertical" className="h-4" />
+                    <Badge
+                      variant="outline"
+                      className="text-[11px] uppercase tracking-wide"
+                    >
+                      {r.status}
+                    </Badge>
+                  </CardTitle>
+                  {r.created_at && (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {new Date(r.created_at).toLocaleString()}
+                    </div>
+                  )}
+                </CardHeader>
+
+                <CardContent className="space-y-4 text-sm">
+                  {/* 요약 */}
+                  {r.summary && (
+                    <p className="whitespace-pre-wrap leading-relaxed">
+                      {r.summary}
+                    </p>
+                  )}
+
+                  {/* 카테고리별 점수 */}
+                  <div className="rounded-lg border border-slate-200/70 dark:border-slate-800/70 p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                      Category Scores
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        Object.entries(scores) as [
+                          keyof ScoresByCategory,
+                          number
+                        ][]
+                      )
+                        .filter(([, value]) => value > 0)
+                        .map(([key, value]) => (
+                          <Badge
+                            key={key}
+                            variant="secondary"
+                            className="flex items-center gap-1 text-[11px]"
+                          >
+                            <span>{CATEGORY_LABELS[key]}</span>
+                            <span className="opacity-80">{value}/5</span>
+                          </Badge>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* 이슈 상세 리스트 */}
+                  {details && details.length > 0 && (
+                    <div className="rounded-lg border border-slate-200/70 dark:border-slate-800/70 p-3">
+                      <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground">
+                        <span>Issues</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(r.id)}
+                          className="inline-flex items-center gap-1 text-[11px] text-violet-600 hover:underline dark:text-violet-300"
+                        >
+                          {expanded ? "접기" : "상세보기"}
+                          {expanded ? (
+                            <ChevronUp className="h-3 w-3" />
+                          ) : (
+                            <ChevronDown className="h-3 w-3" />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {details
+                          .slice(0, expanded ? details.length : 3)
+                          .map((d, idx) => (
+                            <div
+                              key={d.issue_id ?? idx}
+                              className="rounded-md bg-slate-50 p-2 text-xs dark:bg-slate-900/60"
+                            >
+                              <div className="mb-1 flex flex-wrap items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  {d.issue_category}
+                                </Badge>
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                    severityColor(d.issue_severity)
+                                  )}
+                                >
+                                  {d.issue_severity}
+                                </span>
+                                {typeof d.issue_line_number === "number" && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    line {d.issue_line_number}
+                                    {typeof d.issue_column_number === "number"
+                                      ? `, col ${d.issue_column_number}`
+                                      : ""}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="font-medium">
+                                {d.issue_summary}
+                              </div>
+                              {d.issue_details && (
+                                <div className="mt-1 whitespace-pre-wrap text-[11px] text-muted-foreground">
+                                  {d.issue_details}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                        {details.length > 3 && !expanded && (
+                          <div className="pt-1 text-[11px] text-muted-foreground">
+                            외 {details.length - 3}개 이슈 더 있음…
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
