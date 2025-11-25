@@ -2,16 +2,26 @@
 const BACKEND_BASE =
   import.meta.env.VITE_BACKEND_URL || "http://18.205.229.159:8000";
 
-// 전체 페이지 리다이렉트용 (로그인 화면에서 사용)
-export function startGithubLogin(state: string = "web") {
+// ✅ 현재 프론트의 origin을 state에 같이 실어보내는 헬퍼
+function buildState(flow: "web" | "signup") {
+  const origin = window.location.origin; // 예: http://localhost:3000, https://web-dkmv.vercel.app
+  return `${flow}:${origin}`;
+}
+
+// ✅ 전체 페이지 리다이렉트용 (로그인 화면에서 사용)
+export function startGithubLogin(flow: "web" | "signup" = "web") {
+  const state = buildState(flow);
+
   const url = `${BACKEND_BASE}/auth/github/login?state=${encodeURIComponent(
     state
   )}`;
   window.location.href = url;
 }
 
-// 팝업용 (회원가입 화면에서 GitHub 연동 버튼)
-export function startGithubLoginPopup(state: string = "signup") {
+// ✅ 팝업용 (회원가입 화면에서 GitHub 연동 버튼)
+export function startGithubLoginPopup(flow: "signup" | "web" = "signup") {
+  const state = buildState(flow);
+
   const url = `${BACKEND_BASE}/auth/github/login?state=${encodeURIComponent(
     state
   )}`;
