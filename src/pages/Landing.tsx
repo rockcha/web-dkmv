@@ -1,11 +1,9 @@
 // src/pages/Landing.tsx
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Rocket, ArrowRight, Code2, Gauge, Monitor } from "lucide-react";
+import { Code2, Gauge, Monitor } from "lucide-react";
 import { TypingAnimation } from "@/components/ui/typing-animation";
-import VscodeTokenButton from "@/components/VscodeTokenButton";
+import DashboardTokenCta from "@/components/DashboardTokenCta";
 
 const FLOW_STEPS = [
   {
@@ -202,7 +200,7 @@ export default function Landing() {
                 </div>
               </div>
 
-              {/* CTA + 타이핑 애니메이션 */}
+              {/* CTA: 타이핑 + 대시보드/토큰 페어 컴포넌트 */}
               <div
                 className={`
                   mt-8 transform-gpu transition-all duration-700 ease-out
@@ -210,7 +208,6 @@ export default function Landing() {
                 `}
                 style={{ transitionDelay: hasLoaded ? "220ms" : "0ms" }}
               >
-                {/* 👉 magicui TypingAnimation 사용 */}
                 <TypingAnimation
                   as="div"
                   className="text-sm font-semibold tracking-wide text-violet-700 dark:text-violet-300"
@@ -224,50 +221,11 @@ export default function Landing() {
                   cursorStyle="underscore"
                 />
 
-                <div className="mt-4 flex justify-center lg:justify-start">
-                  <Button
-                    asChild
-                    size="lg"
-                    className="
-                      group relative inline-flex h-16 w-full max-w-xs items-center justify-center overflow-hidden
-                      rounded-2xl border border-violet-500/70
-                      bg-gradient-to-r from-violet-500 via-violet-600 to-fuchsia-500
-                      text-base sm:text-lg font-semibold text-white
-                      shadow-[0_18px_40px_rgba(88,28,135,0.45)]
-                      transition-all duration-300
-                      hover:-translate-y-0.5 hover:scale-[1.02]
-                      hover:shadow-[0_22px_50px_rgba(88,28,135,0.7)]
-                      active:scale-[0.99]
-                    "
-                  >
-                    <Link
-                      to="/mypage/dashboard"
-                      aria-label="DKMV 대시보드 시작하기"
-                    >
-                      <span className="flex items-center gap-2">
-                        <Rocket
-                          className="
-                            size-5
-                            transition-transform duration-300
-                            group-hover:-translate-y-0.5 group-hover:translate-x-0.5
-                          "
-                        />
-                        <span>대시보드로</span>
-                        <ArrowRight
-                          className="
-                            size-4 opacity-0 -translate-x-1
-                            transition-all duration-300
-                            group-hover:opacity-100 group-hover:translate-x-0
-                          "
-                        />
-                      </span>
-                    </Link>
-                  </Button>
-                </div>
+                <DashboardTokenCta />
               </div>
             </div>
           </div>
-          <VscodeTokenButton />
+
           {/* 오른쪽: 히어로 비디오 + 보기 모드 토글 버튼 */}
           <div
             className={`
@@ -326,7 +284,6 @@ export default function Landing() {
               className="
                 relative overflow-hidden
                 rounded-3xl border border-slate-200/80 bg-black/90
-             
                 dark:border-slate-800
                 aspect-video
               "
