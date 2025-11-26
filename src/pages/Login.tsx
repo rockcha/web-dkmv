@@ -1,6 +1,6 @@
 // src/pages/Login.tsx
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Github } from "lucide-react";
@@ -13,7 +13,13 @@ import { toast } from "sonner";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, isLoading, refresh } = useAuth();
+
+  // ✅ extension 플로우인지 여부 (예: /login?from=extension)
+  const searchParams = new URLSearchParams(location.search);
+  const from = searchParams.get("from");
+  const isExtensionFlow = from === "extension";
 
   // ✅ 순차 등장 애니메이션용
   const [mounted, setMounted] = useState(false);
@@ -21,13 +27,6 @@ export default function LoginPage() {
   // ✅ oauth:success 한 번만 처리 (React StrictMode 이펙트 2번 방지)
   const handledRef = useRef(false);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const from = params.get("from");
-    if (from === "extension") {
-      window.localStorage.setItem("dkmv_login_origin", "extension");
-    }
-  }, []);
   // 이미 로그인돼 있으면 /landing으로
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -44,11 +43,15 @@ export default function LoginPage() {
   // 🎯 실제 GitHub OAuth 로그인 (전체 페이지 리다이렉트)
   const handleGithubLogin = () => {
     if (isLoading) return;
-    // state는 web으로 고정해서 사용 (백에서 state="web"을 프론트 로그인 플로우로 처리)
-    startGithubLogin("web");
+    /**
+     * 👉 웹에서 직접 접속한 경우: state = "web" (기존 플로우 유지)
+     * 👉 익스텐션에서 /login?from=extension 으로 연 경우: state = "extension"
+     */
+    const state = isExtensionFlow ? "extension" : "web";
+    startGithubLogin(state);
   };
 
-  // 🎯 "처음이신가요? 계정 연동하기" → signup 팝업 플로우 실행
+  // 🎯 "처음이신가요? 계정 연동하기" → signup 팝업 플로우 실행 (웹에서만 사용)
   const handleGithubConnect = () => {
     if (isLoading) return;
 
@@ -66,7 +69,7 @@ export default function LoginPage() {
     });
   };
 
-  // 팝업에서 postMessage로 보내주는 oauth:success 처리
+  // 팝업에서 postMessage로 보내주는 oauth:success 처리 (웹 signup 플로우)
   useEffect(() => {
     const handleMessage = async (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
@@ -183,6 +186,12 @@ export default function LoginPage() {
                 <span className="text-2xl font-bold text-slate-900 dark:text-slate-50">
                   Don&apos;t Kill My Vibe
                 </span>
+                {isExtensionFlow && (
+                  <span className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    VS Code 확장에서 DKMV 리뷰를 사용하기 위해 GitHub로
+                    로그인합니다.
+                  </span>
+                )}
               </div>
             </div>
 
@@ -326,27 +335,29 @@ export default function LoginPage() {
                   홈으로
                 </Button>
 
-                {/* 🔁 Signup의 연동하기 버튼 역할로 교체 */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="
-                    w-full sm:w-auto
-                    cursor-pointer
-                    px-4 py-2.5
-                    text-violet-600 dark:text-violet-300
-                    bg-transparent
-                    hover:bg-violet-50 dark:hover:bg-violet-950/40
-                    font-medium
-                    transition-colors transition-transform duration-150
-                    hover:-translate-y-0.5 hover:shadow-sm
-                    active:translate-y-[1px]
-                  "
-                  onClick={handleGithubConnect}
-                  disabled={isLoading}
-                >
-                  처음이신가요? 계정 연동하기
-                </Button>
+                {/* 🔁 Signup의 연동하기 버튼 역할 (웹에서만 노출) */}
+                {!isExtensionFlow && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="
+                      w-full sm:w-auto
+                      cursor-pointer
+                      px-4 py-2.5
+                      text-violet-600 dark:text-violet-300
+                      bg-transparent
+                      hover:bg-violet-50 dark:hover:bg-violet-950/40
+                      font-medium
+                      transition-colors transition-transform duration-150
+                      hover:-translate-y-0.5 hover:shadow-sm
+                      active:translate-y-[1px]
+                    "
+                    onClick={handleGithubConnect}
+                    disabled={isLoading}
+                  >
+                    처음이신가요? 계정 연동하기
+                  </Button>
+                )}
               </div>
             </section>
           </div>

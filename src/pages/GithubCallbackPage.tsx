@@ -20,6 +20,9 @@ export default function GithubCallbackPage() {
     const params = new URLSearchParams(location.search);
     const token = params.get("token");
     const status = params.get("status") ?? "new"; // "new" | "existing"
+    // (선택) 익스텐션 웹 플로우용 파라미터 (백엔드에서 붙여줄 수 있음)
+    const source = params.get("source") ?? params.get("from") ?? "web";
+    const isExtensionFlow = source === "extension";
 
     if (!token) {
       toast.error("GitHub 로그인에 실패했습니다.");
@@ -60,42 +63,15 @@ export default function GithubCallbackPage() {
           return;
         }
 
-        // 🔍 이 로그인 요청이 "익스텐션에서 시작된 것"인지 체크
-        //  - LoginPage에서 ?from=extension 으로 진입하면
-        //    localStorage.setItem("dkmv_login_origin", "extension") 해둔다고 가정
-        const fromFlag = window.localStorage.getItem("dkmv_login_origin");
-        const fromExtension = fromFlag === "extension";
-
-        if (fromExtension) {
-          // 한 번 사용했으니 플래그 제거
-          window.localStorage.removeItem("dkmv_login_origin");
-
-          try {
-            // 🚪 VS Code URI로 리다이렉트 → extension.ts의 UriHandler가 받음
-            const vscodeUrl = new URL("vscode://rockcha.dkmv/auth-callback");
-            vscodeUrl.searchParams.set("token", token);
-            vscodeUrl.searchParams.set("login", me.login);
-            if (me.avatar_url) {
-              vscodeUrl.searchParams.set("avatar_url", me.avatar_url);
-            }
-
-            window.location.href = vscodeUrl.toString();
-            return;
-          } catch (err) {
-            console.error("VS Code URI 생성 실패", err);
-            // 실패하더라도 아래 웹 플로우는 그대로 태운다
-          }
-        }
-
-        // 💻 여기부터는 "기존 순수 웹 로그인 플로우" 그대로 유지
-        if (status === "existing") {
-          toast.info("이미 연동된 GitHub 계정입니다.", {
-            description: "해당 계정으로 자동 로그인되었어요.",
+        if (isExtensionFlow) {
+          // 익스텐션이 띄운 웹에서 로그인 완료된 경우 (선택적 메시지)
+          toast.success("로그인이 완료되었습니다.", {
+            description:
+              "이제 VS Code로 돌아가 DKMV 확장 프로그램에서 코드를 리뷰할 수 있어요.",
           });
         } else {
-          toast.success("GitHub 계정이 연동되었습니다.", {
-            description: "DKMV 계정 생성 후 자동 로그인되었어요.",
-          });
+          // 기본 웹 로그인 플로우
+          toast.success("GitHub 로그인 완료!");
         }
 
         navigate("/landing", { replace: true });
