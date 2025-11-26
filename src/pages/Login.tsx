@@ -21,6 +21,13 @@ export default function LoginPage() {
   // ✅ oauth:success 한 번만 처리 (React StrictMode 이펙트 2번 방지)
   const handledRef = useRef(false);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const from = params.get("from");
+    if (from === "extension") {
+      window.localStorage.setItem("dkmv_login_origin", "extension");
+    }
+  }, []);
   // 이미 로그인돼 있으면 /landing으로
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
