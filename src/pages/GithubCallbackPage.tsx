@@ -60,8 +60,44 @@ export default function GithubCallbackPage() {
           return;
         }
 
-        // 로그인 정상 완료
-        toast.success("GitHub 로그인 완료!");
+        // 🔍 이 로그인 요청이 "익스텐션에서 시작된 것"인지 체크
+        //  - LoginPage에서 ?from=extension 으로 진입하면
+        //    localStorage.setItem("dkmv_login_origin", "extension") 해둔다고 가정
+        const fromFlag = window.localStorage.getItem("dkmv_login_origin");
+        const fromExtension = fromFlag === "extension";
+
+        if (fromExtension) {
+          // 한 번 사용했으니 플래그 제거
+          window.localStorage.removeItem("dkmv_login_origin");
+
+          try {
+            // 🚪 VS Code URI로 리다이렉트 → extension.ts의 UriHandler가 받음
+            const vscodeUrl = new URL("vscode://rockcha.dkmv/auth-callback");
+            vscodeUrl.searchParams.set("token", token);
+            vscodeUrl.searchParams.set("login", me.login);
+            if (me.avatar_url) {
+              vscodeUrl.searchParams.set("avatar_url", me.avatar_url);
+            }
+
+            window.location.href = vscodeUrl.toString();
+            return;
+          } catch (err) {
+            console.error("VS Code URI 생성 실패", err);
+            // 실패하더라도 아래 웹 플로우는 그대로 태운다
+          }
+        }
+
+        // 💻 여기부터는 "기존 순수 웹 로그인 플로우" 그대로 유지
+        if (status === "existing") {
+          toast.info("이미 연동된 GitHub 계정입니다.", {
+            description: "해당 계정으로 자동 로그인되었어요.",
+          });
+        } else {
+          toast.success("GitHub 계정이 연동되었습니다.", {
+            description: "DKMV 계정 생성 후 자동 로그인되었어요.",
+          });
+        }
+
         navigate("/landing", { replace: true });
       } catch (e) {
         console.error(e);

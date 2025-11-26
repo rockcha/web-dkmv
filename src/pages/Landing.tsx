@@ -325,7 +325,7 @@ export default function Landing() {
               className="
                 relative overflow-hidden
                 rounded-3xl border border-slate-200/80 bg-black/90
-                shadow-xl shadow-slate-900/25
+             
                 dark:border-slate-800
                 aspect-video
               "

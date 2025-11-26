@@ -4,7 +4,7 @@ import { Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 
 import AppLayout from "./AppLayout";
 import LoginPage from "@/pages/Login";
-import SignupPage from "@/pages/Signup";
+
 import GithubCallbackPage from "@/pages/GithubCallbackPage";
 import { useAuth } from "@/features/auth/AuthContext";
 
@@ -95,7 +95,7 @@ export default function AppRoutes() {
           <Route path="/landing" element={<Landing />} />
           <Route path="/ui/reviews" element={<PostAuthRedirect />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+
           {/* 🔐 보호 라우트 */}
           <Route element={<RequireAuthLayout />}>
             <Route path="/mypage/dashboard" element={<Dashboard />} />

@@ -3,13 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Github, Bug } from "lucide-react";
+import { Github } from "lucide-react";
 import {
-  mintDebugTokenByUserId,
   startGithubLogin,
+  startGithubLoginPopup,
 } from "@/features/auth/authApi";
-import { setToken } from "@/features/auth/token";
-import type { AuthUser } from "@/features/auth/AuthContext";
 import { useAuth } from "@/features/auth/AuthContext";
 import { toast } from "sonner";
 
@@ -17,15 +15,11 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, refresh } = useAuth();
 
-  const [githubLogin, setGithubLogin] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   // ✅ 순차 등장 애니메이션용
   const [mounted, setMounted] = useState(false);
 
-  // ✅ 인풋 자동 포커스용 (디버그 로그인용)
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  // ✅ oauth:success 한 번만 처리 (React StrictMode 이펙트 2번 방지)
+  const handledRef = useRef(false);
 
   // 이미 로그인돼 있으면 /landing으로
   useEffect(() => {
@@ -40,13 +34,6 @@ export default function LoginPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 로딩 끝나고 로그인 안 된 상태면 인풋에 포커스(디버그 모드에서만 실질적으로 의미 있음)
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [isLoading, isAuthenticated]);
-
   // 🎯 실제 GitHub OAuth 로그인 (전체 페이지 리다이렉트)
   const handleGithubLogin = () => {
     if (isLoading) return;
@@ -54,59 +41,63 @@ export default function LoginPage() {
     startGithubLogin("web");
   };
 
-  // 🧪 개발용: 아이디로 디버그 토큰 로그인
-  const handleDebugSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!githubLogin.trim() || isLoading || isSubmitting) return;
+  // 🎯 "처음이신가요? 계정 연동하기" → signup 팝업 플로우 실행
+  const handleGithubConnect = () => {
+    if (isLoading) return;
 
-    setIsSubmitting(true);
-    setError(null);
+    const popup = startGithubLoginPopup("signup");
 
-    try {
-      const res = await fetch("/api/v1/users");
-      if (!res.ok) {
-        throw new Error("유저 목록 조회 실패");
-      }
-
-      const users = (await res.json()) as AuthUser[];
-
-      const matched = users.find(
-        (u) => u.login.toLowerCase() === githubLogin.trim().toLowerCase()
-      );
-
-      if (!matched) {
-        const msg = "등록되지 않은 GitHub 아이디입니다.";
-        setError(msg);
-        toast.error(msg, {
-          description: "DKMV에 등록된 GitHub 계정인지 다시 확인해주세요.",
-        });
-        return;
-      }
-
-      const token = await mintDebugTokenByUserId(matched.id);
-
-      setToken(token);
-      await refresh();
-
-      toast.success("디버그 로그인 완료", {
-        description: `${matched.login} 님으로 로그인했습니다.`,
+    if (!popup || popup.closed) {
+      toast.error("팝업을 열 수 없습니다.", {
+        description: "브라우저 팝업 차단 설정을 확인해주세요.",
       });
-      navigate("/landing", { replace: true });
-    } catch (err) {
-      console.error(err);
-      const msg =
-        "로그인 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-      setError(msg);
-      toast.error("로그인 중 오류가 발생했습니다.", {
-        description: "잠시 후 다시 시도해주세요.",
-      });
-    } finally {
-      setIsSubmitting(false);
+      return;
     }
+
+    toast("GitHub 인증을 진행합니다.", {
+      description: "열린 팝업에서 GitHub 로그인을 완료해주세요.",
+    });
   };
 
-  const isBusy = isLoading || isSubmitting;
-  const hasError = !!error;
+  // 팝업에서 postMessage로 보내주는 oauth:success 처리
+  useEffect(() => {
+    const handleMessage = async (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      if (e.data?.type !== "oauth:success") return;
+
+      // ✅ 이미 처리했다면 무시 (StrictMode 대응)
+      if (handledRef.current) return;
+      handledRef.current = true;
+
+      const status = (e.data as { status?: string }).status ?? "new";
+
+      try {
+        await refresh();
+
+        if (status === "existing") {
+          // 이미 연동된 계정 → 다시 가입 아니라 “자동 로그인” 안내
+          toast.info("이미 연동된 GitHub 계정입니다.", {
+            description: "해당 계정으로 자동 로그인되었어요.",
+          });
+        } else {
+          // 새로 연동된 계정 → 계정 생성 + 자동 로그인 안내
+          toast.success("GitHub 계정이 연동되었습니다.", {
+            description: "DKMV 계정 생성 후 자동 로그인되었어요.",
+          });
+        }
+
+        navigate("/landing", { replace: true });
+      } catch (err) {
+        console.error("GitHub 연동 이후 상태 갱신 실패", err);
+        toast.error("연동 상태를 불러오지 못했습니다.", {
+          description: "잠시 후 다시 시도해주세요.",
+        });
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [refresh, navigate]);
 
   return (
     <main
@@ -291,57 +282,6 @@ export default function LoginPage() {
                   <Github className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
                   GitHub로 로그인하기
                 </Button>
-
-                {/* 🧪 개발용 디버그 로그인 (접어서 숨김) */}
-                <details className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                  <summary className="flex items-center gap-1 cursor-pointer select-none">
-                    <Bug className="h-3 w-3" />
-                    개발용 디버그 로그인
-                  </summary>
-
-                  <form className="mt-3 space-y-3" onSubmit={handleDebugSubmit}>
-                    <div className="space-y-2">
-                      <label className="block text-xs font-medium text-slate-700 dark:text-slate-200">
-                        GitHub 아이디
-                      </label>
-                      <input
-                        ref={inputRef}
-                        type="text"
-                        value={githubLogin}
-                        onChange={(e) => {
-                          setGithubLogin(e.target.value);
-                          if (error) setError(null);
-                        }}
-                        placeholder="Github 계정 아이디를 입력해주세요.. "
-                        className={[
-                          "w-full rounded-lg px-3.5 py-3 text-sm sm:text-base",
-                          "bg-slate-50 text-slate-900 placeholder:text-slate-400",
-                          "border focus:outline-none",
-                          "dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500",
-                          hasError
-                            ? "border-red-500/70 focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                            : "border-slate-300 focus:ring-2 focus:ring-violet-500 focus:border-transparent dark:border-slate-700",
-                        ].join(" ")}
-                        aria-invalid={hasError}
-                      />
-                      {hasError && (
-                        <p className="mt-1 text-xs text-red-500">{error}</p>
-                      )}
-                    </div>
-
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      disabled={isBusy || !githubLogin.trim()}
-                    >
-                      {isBusy
-                        ? "디버그 로그인 중..."
-                        : "디버그 토큰으로 로그인"}
-                    </Button>
-                  </form>
-                </details>
               </div>
 
               {/* 하단 보조 버튼들 */}
@@ -379,6 +319,7 @@ export default function LoginPage() {
                   홈으로
                 </Button>
 
+                {/* 🔁 Signup의 연동하기 버튼 역할로 교체 */}
                 <Button
                   type="button"
                   variant="ghost"
@@ -394,7 +335,8 @@ export default function LoginPage() {
                     hover:-translate-y-0.5 hover:shadow-sm
                     active:translate-y-[1px]
                   "
-                  onClick={() => navigate("/signup")}
+                  onClick={handleGithubConnect}
+                  disabled={isLoading}
                 >
                   처음이신가요? 계정 연동하기
                 </Button>
