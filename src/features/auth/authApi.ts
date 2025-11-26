@@ -2,14 +2,22 @@
 const BACKEND_BASE =
   import.meta.env.VITE_BACKEND_URL || "http://18.205.229.159:8000";
 
+/**
+ * 🔁 GitHub 로그인 플로우 타입
+ * - "web"      : 웹 로그인 (기존)
+ * - "signup"   : 웹에서 팝업으로 계정 연동
+ * - "extension": VS Code 익스텐션에서 연 로그인 플로우
+ */
+export type GithubLoginFlow = "web" | "signup" | "extension";
+
 // ✅ 현재 프론트의 origin을 state에 같이 실어보내는 헬퍼
-function buildState(flow: "web" | "signup") {
+function buildState(flow: GithubLoginFlow) {
   const origin = window.location.origin; // 예: http://localhost:3000, https://web-dkmv.vercel.app
   return `${flow}:${origin}`;
 }
 
 // ✅ 전체 페이지 리다이렉트용 (로그인 화면에서 사용)
-export function startGithubLogin(flow: "web" | "signup" = "web") {
+export function startGithubLogin(flow: GithubLoginFlow = "web") {
   const state = buildState(flow);
 
   const url = `${BACKEND_BASE}/auth/github/login?state=${encodeURIComponent(
@@ -19,6 +27,7 @@ export function startGithubLogin(flow: "web" | "signup" = "web") {
 }
 
 // ✅ 팝업용 (회원가입 화면에서 GitHub 연동 버튼)
+//  → 여기서는 여전히 "signup" / "web"만 사용 (extension 플로우는 전체 리다이렉트만)
 export function startGithubLoginPopup(flow: "signup" | "web" = "signup") {
   const state = buildState(flow);
 
