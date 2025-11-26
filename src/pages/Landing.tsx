@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Rocket, ArrowRight, Code2, Gauge, Monitor } from "lucide-react";
 import { TypingAnimation } from "@/components/ui/typing-animation";
+import VscodeTokenButton from "@/components/VscodeTokenButton";
 
 const FLOW_STEPS = [
   {
@@ -266,7 +267,7 @@ export default function Landing() {
               </div>
             </div>
           </div>
-
+          <VscodeTokenButton />
           {/* 오른쪽: 히어로 비디오 + 보기 모드 토글 버튼 */}
           <div
             className={`
