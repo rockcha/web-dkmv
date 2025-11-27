@@ -101,6 +101,16 @@ export default function Playground() {
       return;
     }
 
+    if (!user.github_id) {
+      // 이 경우는 거의 없겠지만, 방어적으로 한 번 더 체크
+      setError(
+        "현재 사용자 github_id를 찾을 수 없습니다. 다시 로그인 후 시도해 주세요."
+      );
+      setLoading(false);
+      setPhase("error");
+      return;
+    }
+
     const ac = new AbortController();
     abortRef.current = ac;
 
@@ -110,27 +120,34 @@ export default function Playground() {
       // 🔹 최신 Swagger 기준 ReviewRequest payload
       const payload = {
         meta: {
-          user_id: user.id, // integer | null
+          // ✅ 백엔드 스펙: github_id string (깃허브 numeric ID)
+          github_id: user.github_id,
+
           review_id: null as number | null,
           version: "v1",
           actor: "web-playground",
+
+          // ✅ language / trigger는 meta에
+          language: "python",
+          trigger: "manual",
+
           code_fingerprint: null as string | null,
-          model: modelId, // string | null
-          result: {
-            result_ref: null as string | null,
-            error_message: null as string | null,
-          },
-          audit: {
-            created_at: nowIso,
-            updated_at: nowIso,
-          },
+          model: modelId,
+
+          // ✅ 아직 결과 없으니 null
+          result: null as {
+            result_ref: string | null;
+            error_message: string | null;
+          } | null,
+
+          // ✅ string(date-time) 하나
+          audit: nowIso as string,
         },
         body: {
           snippet: {
+            // ✅ snippet은 code만 필요
             code,
-            language: "python", // 항상 python
           },
-          trigger: "manual" as const,
         },
       };
 
@@ -161,7 +178,7 @@ export default function Playground() {
 
       try {
         const parsed = JSON.parse(postText);
-        // ReviewRequestResponse 예시: body.review_id, body.status
+        // 🔸 ReviewRequestResponse: { meta, body: { review_id } } 가정
         reviewId = parsed?.body?.review_id ?? null;
         const status = parsed?.body?.status;
         setResponseInfo(
@@ -267,7 +284,8 @@ export default function Playground() {
                 <>
                   <span className="text-muted-foreground">현재 사용자</span>
                   <Badge variant="secondary">
-                    id: {user.id} · {user.login ?? "unknown"}
+                    github_id: {user.github_id ?? "?"} · login:{" "}
+                    {user.login ?? "unknown"}
                   </Badge>
                 </>
               ) : (

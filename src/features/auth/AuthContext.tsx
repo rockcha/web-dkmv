@@ -12,7 +12,7 @@ import { getToken, clearToken } from "./token";
 
 export type AuthUser = {
   id: number;
-  github_id?: string; // ✅ 백엔드 /v1/users 응답에 맞춤
+  github_id?: string; // ✅ /v1/users/me 에서 내려오는 GitHub numeric ID
   login: string;
   name?: string | null;
   avatar_url?: string | null;
@@ -23,7 +23,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  refresh: () => Promise<AuthUser | null>; // ✅ 유저 또는 null 반환
+  refresh: () => Promise<AuthUser | null>;
   logout: () => Promise<void>;
 };
 
@@ -49,14 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.status === 401) {
-        // 토큰 만료 or 잘못된 토큰
         clearToken();
         setUser(null);
         return null;
       }
 
       if (!res.ok) {
-        // 그 외 에러들도 전부 로그인 안 된 상태로 간주
         setUser(null);
         return null;
       }
@@ -77,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     (async () => {
       setIsLoading(true);
-      await fetchMe(); // ← 변수 없이 그냥 await만
+      await fetchMe();
       if (!isCancelled) {
         setIsLoading(false);
       }
@@ -93,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     const me = await fetchMe();
     setIsLoading(false);
-    return me; // 성공 시 AuthUser, 실패 시 null
+    return me;
   }, [fetchMe]);
 
   const logout = useCallback(async () => {
