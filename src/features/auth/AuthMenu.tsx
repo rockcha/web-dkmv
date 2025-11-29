@@ -162,7 +162,7 @@ export function AuthMenu({ className }: AuthMenuProps) {
               <button
                 disabled={isLoading}
                 className={`
-                  h-9 w-9
+                  h-12 w-12
                   rounded-full
                   border border-slate-300 dark:border-slate-700
                   overflow-hidden

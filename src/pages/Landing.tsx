@@ -28,9 +28,10 @@ const VIOLET_CHIP_CLASS =
   "rounded-md bg-violet-500/5 px-1.5 py-0.5 " +
   "text-violet-700 dark:text-violet-300";
 
+console.log("✅ Landing 렌더링 됨");
+
 export default function Landing() {
   const [hasLoaded, setHasLoaded] = useState(false);
-  // ✅ 기본값을 idle 로
   const [videoMode, setVideoMode] = useState<"extension" | "idle">("idle");
 
   useEffect(() => {
@@ -38,27 +39,36 @@ export default function Landing() {
     return () => clearTimeout(timer);
   }, []);
 
+  // 🔁 일정 주기로 Idle ↔ Extension 자동 전환
+  useEffect(() => {
+    const interval = setInterval(
+      () => setVideoMode((prev) => (prev === "idle" ? "extension" : "idle")),
+      10000
+    );
+    return () => clearInterval(interval);
+  }, []);
+
   const fadeClass = hasLoaded
     ? "opacity-100 translate-y-0"
     : "opacity-0 translate-y-4";
-
-  const currentYear = new Date().getFullYear();
 
   const isExtensionMode = videoMode === "extension";
   const isIdleMode = videoMode === "idle";
 
   return (
-    <main
+    // 🔹 AppLayout에서 main row 전체 높이를 채우도록 h-full
+    <div
       className="
-        min-h-screen
+        flex h-full flex-col
         bg-white text-slate-900
         dark:bg-slate-950 dark:text-slate-100
       "
     >
-      {/* Hero 섹션: 왼쪽 텍스트 / 오른쪽 비디오 */}
-      <section
+      {/* 메인 컨텐츠: main 기준 좌/우 분할 */}
+      <div
         className="
-          relative overflow-hidden
+          relative flex flex-1 flex-col lg:flex-row
+          overflow-hidden
           border-b border-slate-200 dark:border-slate-800
           bg-gradient-to-b from-slate-50 via-white to-slate-50
           dark:from-slate-950 dark:via-slate-950 dark:to-slate-900
@@ -67,26 +77,20 @@ export default function Landing() {
         {/* 은은한 배경 그라디언트 원 */}
         <div className="pointer-events-none absolute inset-0 -z-10 opacity-60">
           <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full blur-3xl bg-violet-300/40 dark:bg-violet-500/25" />
-          <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full blur-3xl bg-cyan-300/40 dark:bg-cyan-500/20" />
+          <div className="absolute -bottom-20 -right-20 h-72 w-72 rounded-full blur-3xl bg-cyan-300/40 dark:bg-cyan-500/20" />
         </div>
 
-        <div
-          className="
-            mx-auto flex max-w-6xl lg:max-w-7xl flex-col gap-10
-            px-6 py-20
-            lg:flex-row lg:items-center lg:gap-16
-          "
+        {/* ====== 왼쪽 컬럼: 기존 Hero UI 유지 ====== */}
+        <section
+          className={`
+            flex-1 flex items-center
+            px-6 py-16 lg:py-20
+            transform-gpu transition-all duration-700 ease-out
+            ${fadeClass}
+          `}
         >
-          {/* 왼쪽: 제목 / 서브카피 / 플로우 / CTA */}
-          <div
-            className={`
-              w-full lg:flex-[0.9]
-              transform-gpu transition-all duration-700 ease-out
-              ${fadeClass}
-            `}
-            style={{ transitionDelay: hasLoaded ? "0ms" : "0ms" }}
-          >
-            <div className="mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
+          <div className="mx-auto w-full max-w-3xl ml-6">
+            <div className="max-w-xl text-center">
               {/* 제목 + 로고 + Beta 뱃지 */}
               <h1
                 className="
@@ -96,7 +100,7 @@ export default function Landing() {
                 "
               >
                 <img
-                  src="/logo.png" // /public/logo.png
+                  src="/logo.png"
                   alt="DKMV"
                   width={40}
                   height={40}
@@ -107,7 +111,7 @@ export default function Landing() {
                   loading="eager"
                   decoding="async"
                 />
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-3">
                   Don’t Kill My Vibe
                   <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/50 bg-violet-500/10 px-2 py-0.5 text-[0.65rem] font-semibold text-violet-700 dark:text-violet-200">
                     Beta
@@ -120,7 +124,7 @@ export default function Landing() {
               </h1>
 
               {/* 서브카피 + 키워드 하이라이트 */}
-              <p className="mt-3 text-sm sm:text-base text-slate-600 dark:text-slate-300">
+              <p className="mt-5 text-sm sm:text-base text-slate-600 dark:text-slate-300">
                 <span className="font-medium">AI가 만들어낸 코드</span>를{" "}
                 <span className={VIOLET_CHIP_CLASS}>정적 분석 + LLM 리뷰</span>
                 로 점수화하고,{" "}
@@ -132,7 +136,7 @@ export default function Landing() {
               {/* 플로우 카드 */}
               <div
                 className={`
-                  mt-6 transform-gpu transition-all duration-700 ease-out
+                  mt-8 transform-gpu transition-all duration-700 ease-out
                   ${fadeClass}
                 `}
                 style={{ transitionDelay: hasLoaded ? "120ms" : "0ms" }}
@@ -146,6 +150,7 @@ export default function Landing() {
                         className="
                           group relative flex min-h-[96px] flex-col justify-between
                           rounded-2xl border border-violet-200/80
+                          bg-white/80
                           text-xs sm:text-sm shadow-sm
                           dark:border-violet-400/50
                           dark:bg-slate-900/70
@@ -163,14 +168,9 @@ export default function Landing() {
                                 group-hover:-translate-y-0.5
                               "
                             >
-                              <Icon
-                                className="
-                                  size-7
-                                  text-violet-500
-                                "
-                              />
+                              <Icon className="size-7 text-violet-500" />
                             </div>
-                            <div className="flex flex-col ">
+                            <div className="flex flex-col">
                               <CardTitle
                                 className="
                                   text-[0.8rem] sm:text-sm
@@ -225,150 +225,78 @@ export default function Landing() {
               </div>
             </div>
           </div>
+        </section>
 
-          {/* 오른쪽: 히어로 비디오 + 보기 모드 토글 버튼 */}
-          <div
-            className={`
-              w-full lg:flex-[1.1]
-              transform-gpu transition-all duration-700 ease-out
-              ${fadeClass}
-            `}
-            style={{ transitionDelay: hasLoaded ? "300ms" : "0ms" }}
-          >
-            {/* 보기 모드 토글 */}
-            <div className="mb-4 flex items-center justify-end gap-3">
-              <span className="text-[0.7rem] font-medium text-violet-700 dark:text-violet-300">
-                보기 모드
-              </span>
-              <div
-                className="
-                  inline-flex items-center gap-1
-                  rounded-full border border-violet-200/80 bg-violet-50/95
-                  px-1 py-1 shadow-sm
-                  dark:border-violet-600/70 dark:bg-violet-950/70
-                "
-              >
-                <button
-                  type="button"
-                  onClick={() => setVideoMode("idle")}
-                  className={`
-                    rounded-full px-3 py-1 text-[0.8rem] font-medium
-                    transition-all duration-150 cursor-pointer
-                    ${
-                      isIdleMode
-                        ? "bg-violet-600 text-white shadow-sm dark:bg-violet-400 "
-                        : "text-violet-600/80 hover:text-violet-800 dark:text-violet-200/80 dark:hover:text-violet-50"
-                    }
-                  `}
-                >
-                  Idle 화면
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVideoMode("extension")}
-                  className={`
-                    rounded-full px-3 py-1 text-[0.8rem] font-medium
-                    transition-all duration-150 cursor-pointer
-                    ${
-                      isExtensionMode
-                        ? "bg-violet-600 text-white shadow-sm dark:bg-violet-400 "
-                        : "text-violet-600/80 hover:text-violet-800 dark:text-violet-200/80 dark:hover:text-violet-50"
-                    }
-                  `}
-                >
-                  VSCode 익스텐션
-                </button>
-              </div>
-            </div>
-            <div
-              className="
-                relative overflow-hidden
-                rounded-3xl border border-slate-200/80 bg-black/90
-                dark:border-slate-800
-                aspect-video
-              "
-            >
-              {/* 비디오 상단 라벨 */}
-              <div className="absolute left-4 top-4 z-10 inline-flex items-center gap-2 rounded-lg bg-black/65 px-3 py-1 text-[0.7rem] font-medium text-slate-100">
-                <Monitor className="size-3.5" />
-                {isExtensionMode
-                  ? "VSCode 익스텐션 실사용 화면"
-                  : "DKMV Idle 화면"}
-              </div>
-
-              {/* videoMode가 바뀔 때마다 새 video 엘리먼트로 리마운트 */}
-              <video
-                key={videoMode}
-                className="h-full w-full object-cover"
-                autoPlay
-                muted
-                loop
-                playsInline
-              >
-                <source
-                  src={
-                    isExtensionMode ? "/extension-video.mp4" : "/hero-video.mp4"
-                  }
-                  type="video/mp4"
-                />
-                브라우저에서 HTML5 비디오를 지원하지 않습니다.
-              </video>
-
-              {/* 하단 설명 그라디언트 오버레이 */}
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-4 py-4">
-                <p className="text-xs sm:text-sm text-slate-100">
-                  {isExtensionMode ? (
-                    <>
-                      에디터에서 선택한 코드만 전송해{" "}
-                      <span className="font-semibold">
-                        실시간 품질 점수와 상세 피드백
-                      </span>
-                      을 받아볼 수 있습니다.
-                    </>
-                  ) : (
-                    <></>
-                  )}
-                </p>
-              </div>
-            </div>
+        {/* ====== 오른쪽 컬럼: main 기준 오른쪽 절반 전체를 비디오가 차지 ====== */}
+        <aside
+          className="
+            flex-1 relative
+            border-t border-slate-200 lg:border-t-0 lg:border-l
+            border-slate-200 dark:border-slate-800
+            min-h-[260px]
+          "
+        >
+          {/* 비디오 상단 라벨 */}
+          <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-lg bg-black/65 px-3 py-1 text-[0.7rem] font-medium text-slate-100">
+            <Monitor className="size-3.5" />
+            {isExtensionMode ? "VSCode 익스텐션 실사용 화면" : "DKMV Idle 화면"}
           </div>
-        </div>
-      </section>
 
-      <footer
-        className="
-          relative
-          border-t border-slate-200
-          px-6 py-8 text-center text-sm text-slate-500
-          dark:border-slate-800 dark:text-slate-400
-        "
-      >
-        {/* 🔥 헤더와 동일한 보라 스캔 라인 (위쪽 border에 붙이기) */}
-        <div className="pointer-events-none absolute inset-x-0 -top-[2px] h-[3px] overflow-hidden">
-          <div
-            className="
-              h-full w-full
-              bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0
-              bg-[length:200%_100%]
-              animate-header-border-sheen
-            "
-          />
-        </div>
+          {/* Idle 비디오 */}
+          <video
+            className={`
+              absolute inset-0 h-full w-full object-cover
+              transition-opacity duration-700
+              ${isIdleMode ? "opacity-100" : "opacity-0"}
+            `}
+            autoPlay
+            muted
+            loop
+            playsInline
+            src="/hero-video.mp4"
+          >
+            브라우저에서 HTML5 비디오를 지원하지 않습니다.
+          </video>
 
-        <div>© {currentYear} DKMV — Don’t Kill My Vibe</div>
+          {/* VSCode 익스텐션 비디오 */}
+          <video
+            className={`
+              absolute inset-0 h-full w-full object-cover
+              transition-opacity duration-700
+              ${isExtensionMode ? "opacity-100" : "opacity-0"}
+            `}
+            autoPlay
+            muted
+            loop
+            playsInline
+            src="/extension-video.mp4"
+          >
+            브라우저에서 HTML5 비디오를 지원하지 않습니다.
+          </video>
 
-        <div className="mt-2 flex flex-wrap justify-center gap-3 text-[0.75rem] text-slate-400 dark:text-slate-500">
-          <span className="rounded-full border border-slate-200/70 px-3 py-1 dark:border-slate-700/70">
-            사내 PoC · 코드 품질 점수화 시스템
-          </span>
-          <span className="rounded-full border border-slate-200/70 px-3 py-1 dark:border-slate-700/70">
-            VSCode 익스텐션 · 웹 대시보드 통합
-          </span>
-          <span className="hidden rounded-full border border-slate-200/70 px-3 py-1 dark:border-slate-700/70 sm:inline">
-            문의: FE 3팀 오정록
-          </span>
-        </div>
-      </footer>
-    </main>
+          {/* 하단 설명 그라디언트 오버레이 */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-4 py-4">
+            <p className="text-xs sm:text-sm text-slate-100">
+              {isExtensionMode ? (
+                <>
+                  에디터에서 선택한 코드만 전송해{" "}
+                  <span className="font-semibold">
+                    실시간 품질 점수와 상세 피드백
+                  </span>
+                  을 받아볼 수 있습니다.
+                </>
+              ) : (
+                <>
+                  DKMV Idle 화면에서 전체적인{" "}
+                  <span className="font-semibold">분석 흐름</span>과{" "}
+                  <span className="font-semibold">바이브 점수</span>를 확인할 수
+                  있습니다.
+                </>
+              )}
+            </p>
+          </div>
+        </aside>
+      </div>
+    </div>
   );
 }

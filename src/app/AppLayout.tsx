@@ -5,14 +5,7 @@ import { Outlet, NavLink, useLocation } from "react-router-dom";
 import AppHeader from "./AppHeader";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
-import FloatingCreateButton from "@/components/FloatingCreateButton";
 import { DummyDataProvider } from "@/components/DummyDataContext";
 
 import {
@@ -24,6 +17,8 @@ import {
   FlaskConical,
   FileBarChart,
   Settings as SettingsIcon,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -55,22 +50,51 @@ export default function AppLayout() {
   /** ✅ 마이페이지 영역 (/mypage/...) 인지 여부 */
   const isMyPage = pathname.startsWith("/mypage");
 
+  /** ✅ 마이페이지 사이드바 접힘 상태 */
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+
+  const currentYear = new Date().getFullYear();
+
   return (
     <>
       {isLanding ? (
-        // ───────── 랜딩 레이아웃 ─────────
+        // ───────── 랜딩 레이아웃: 헤더 + 컨텐츠 + 푸터 = 100vh ─────────
         <div
           className="
             min-h-screen w-full
             bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100
-            grid grid-rows-[auto_1fr]
+            grid grid-rows-[auto_minmax(0,1fr)_auto]
             text-[16px] sm:text-[17px] md:text-[18px] leading-relaxed
           "
         >
           <AppHeader />
-          <main className="p-0">
+          <main className="p-0 min-h-0">
             <Outlet />
           </main>
+          <footer
+            className="
+              relative
+              flex h-16 sm:h-20 items-center justify-center
+              border-t border-slate-200 dark:border-slate-800
+              px-6
+              text-center text-xs sm:text-[0.8rem] text-slate-500 dark:text-slate-400
+            "
+          >
+            <div className="pointer-events-none absolute inset-x-0 -top-[2px] h-[3px] overflow-hidden">
+              <div
+                className="
+                  h-full w-full
+                  bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0
+                  bg-[length:200%_100%]
+                  animate-header-border-sheen
+                "
+              />
+            </div>
+
+            <div className="text-md">
+              © {currentYear} DKMV — Don’t Kill My Vibe
+            </div>
+          </footer>
         </div>
       ) : isMyPage ? (
         // ───────── /mypage/* 레이아웃 (사이드바 + 타이틀) ─────────
@@ -85,80 +109,139 @@ export default function AppLayout() {
           >
             <AppHeader />
 
-            <div className="grid grid-cols-[260px_1fr] md:grid-cols-[280px_1fr] xl:grid-cols-[300px_1fr]">
+            <div className="grid grid-cols-[auto_1fr]">
               {/* ========== 사이드바 ========== */}
-              <aside className="border-r border-slate-200 dark:border-slate-800 h-[calc(100vh-56px)] sticky top-14">
-                <TooltipProvider delayDuration={100}>
-                  <ScrollArea className="h-full">
-                    <nav className="px-4 py-5" aria-label="주 메뉴">
-                      <p className="px-1 pb-3 text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <aside
+                className={`
+                  border-r border-slate-200 dark:border-slate-800
+                  h-[calc(100vh-128px)]
+                  sticky top-32
+                  overflow-hidden
+                  transition-[width] duration-300 ease-in-out
+                  bg-white/90 dark:bg-slate-950/90
+                  ${
+                    isSidebarCollapsed
+                      ? "w-[72px]"
+                      : "w-[260px] md:w-[280px] xl:w-[300px]"
+                  }
+                `}
+              >
+                <ScrollArea className="h-full">
+                  {/* 상단: 제목 + 접기/펼치기 버튼 */}
+                  <div className="flex items-center justify-between px-3 pt-4 pb-2">
+                    {!isSidebarCollapsed && (
+                      <span className="px-1 text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         메뉴
-                      </p>
+                      </span>
+                    )}
 
-                      <ul className="space-y-1.5">
-                        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-                          <li key={to}>
-                            <NavLink
-                              to={to}
-                              className={({
-                                isActive,
-                              }: {
-                                isActive: boolean;
-                              }) =>
-                                [
-                                  "group relative flex items-center gap-3.5 rounded-xl px-4 py-3 text-[15px] md:text-base transition",
-                                  "hover:bg-slate-100 hover:text-slate-900",
-                                  "dark:hover:bg-slate-900 dark:hover:text-slate-100",
-                                  isActive
-                                    ? [
-                                        "font-semibold",
-                                        "bg-slate-100 text-slate-900 ring-1 ring-slate-200",
-                                        "dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-800",
-                                        "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1.5 before:rounded-full before:bg-violet-500",
-                                      ].join(" ")
-                                    : "text-slate-600 dark:text-slate-300",
-                                ].join(" ")
-                              }
+                    <button
+                      type="button"
+                      onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                      className="
+                        ml-auto flex h-8 w-8 items-center justify-center
+                        rounded-full border border-slate-200 dark:border-slate-700
+                        bg-white/80 dark:bg-slate-900/80
+                        shadow-sm
+                        hover:bg-slate-100 dark:hover:bg-slate-800
+                        transition-all duration-200
+                      "
+                      aria-label={
+                        isSidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"
+                      }
+                    >
+                      {isSidebarCollapsed ? (
+                        <ChevronRight className="size-4 text-slate-600 dark:text-slate-300" />
+                      ) : (
+                        <ChevronLeft className="size-4 text-slate-600 dark:text-slate-300" />
+                      )}
+                    </button>
+                  </div>
+
+                  <nav className="px-2 pb-5" aria-label="주 메뉴">
+                    <ul className="space-y-1.5">
+                      {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+                        <li key={to}>
+                          <NavLink
+                            to={to}
+                            className={({
+                              isActive,
+                            }: {
+                              isActive: boolean;
+                            }) => {
+                              const base =
+                                "group relative flex items-center rounded-xl px-3 py-3 text-[15px] md:text-base transition-all";
+                              const layout = isSidebarCollapsed
+                                ? "justify-center"
+                                : "gap-3.5";
+
+                              const hoverExpanded =
+                                "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-900 dark:hover:text-slate-100";
+                              const hoverCollapsed = "hover:bg-transparent"; // 접혔을 땐 배경 그대로
+
+                              const activeBase = isActive
+                                ? "font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40"
+                                : "text-slate-600 dark:text-slate-300";
+
+                              return [
+                                base,
+                                layout,
+                                isSidebarCollapsed
+                                  ? hoverCollapsed
+                                  : hoverExpanded,
+                                activeBase,
+                              ].join(" ");
+                            }}
+                          >
+                            {/* 아이콘: active 시 부모 텍스트색을 따라 보라색, hover 시 더 진해짐 */}
+                            <Icon
+                              className="
+                                size-5
+                                transition-all duration-200 ease-out
+                                group-hover:scale-110
+                                group-hover:text-violet-500
+                                dark:group-hover:text-violet-400
+                              "
+                            />
+
+                            {/* 라벨: 접히면 부드럽게 사라지고, 펼치면 부드럽게 나타남 */}
+                            <span
+                              className={`
+                                truncate
+                                transition-all duration-300
+                                ${
+                                  isSidebarCollapsed
+                                    ? "max-w-0 opacity-0 ml-0"
+                                    : "max-w-[160px] opacity-100 ml-3"
+                                }
+                              `}
                             >
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex items-center justify-center">
-                                    <Icon className="size-5 transition-transform group-hover:scale-110" />
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent
-                                  side="right"
-                                  className="hidden md:block"
-                                >
-                                  {label}
-                                </TooltipContent>
-                              </Tooltip>
-                              <span className="truncate">{label}</span>
-                            </NavLink>
-                          </li>
-                        ))}
-                      </ul>
+                              {label}
+                            </span>
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
 
-                      <Separator className="my-5 bg-slate-200 dark:bg-slate-800" />
+                    <Separator className="my-5 bg-slate-200 dark:bg-slate-800" />
 
-                      <p className="px-1 pt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                    {!isSidebarCollapsed && (
+                      <p className="px-3 pt-1 text-[12px] text-slate-500 dark:text-slate-400">
                         Don’t Kill My Vibe
                       </p>
-                    </nav>
-                  </ScrollArea>
-                </TooltipProvider>
+                    )}
+                  </nav>
+                </ScrollArea>
               </aside>
 
               {/* ========== 메인 컨텐츠 ========== */}
-              <main className="py-6 ">
+              <main className="p-6 ">
                 <PageHeader pathname={pathname} />
                 <section aria-live="polite">
                   <Outlet />
                 </section>
               </main>
             </div>
-
-            <FloatingCreateButton />
           </div>
         </DummyDataProvider>
       ) : (

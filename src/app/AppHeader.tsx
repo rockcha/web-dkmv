@@ -1,22 +1,28 @@
 // src/layouts/AppHeader.tsx
 import { useEffect, useState, Fragment } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-
 import { Home, Info, DownloadCloud, LayoutDashboard } from "lucide-react";
+
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { AuthMenu } from "@/features/auth/AuthMenu";
 import { useAuth } from "@/features/auth/AuthContext";
 import { toast } from "sonner";
 
 const NAV_ITEMS = [
-  { label: "홈", to: "/", icon: Home },
-  { label: "DKMV란?", to: "/about", icon: Info },
-  { label: "다운로드", to: "/download", icon: DownloadCloud },
+  { label: "홈", labelEn: "Home", to: "/", icon: Home },
+  { label: "DKMV란?", labelEn: "About", to: "/about", icon: Info },
+  {
+    label: "다운로드",
+    labelEn: "Download",
+    to: "/download",
+    icon: DownloadCloud,
+  },
   {
     label: "대시보드",
+    labelEn: "Dashboard",
     to: "/mypage/dashboard",
     icon: LayoutDashboard,
-    requiresAuth: true as const, // ✅ 로그인 필요
+    requiresAuth: true as const,
   },
 ];
 
@@ -32,39 +38,22 @@ export default function AppHeader() {
 
   return (
     <header
-      className={`
-        relative
-        h-24
-        flex items-center
-        border-b border-slate-200 dark:border-slate-800
-        bg-white/70 dark:bg-slate-950/60
-        backdrop-blur supports-[backdrop-filter]:bg-white/50 dark:supports-[backdrop-filter]:bg-slate-950/40
-        animate-header-enter
-        transform-gpu
-        transition-[opacity,transform] duration-500 ease-out
-        ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3"}
-      `}
+      className={`sticky top-0 z-50 w-full
+      relative h-26 flex items-center border-b border-slate-200 dark:border-slate-800
+      bg-white/70 dark:bg-slate-950/60 backdrop-blur
+      supports-[backdrop-filter]:bg-white/50 dark:supports-[backdrop-filter]:bg-slate-950/40
+      animate-header-enter transform-gpu transition-[opacity,transform] duration-500 ease-out
+      ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-3"}`}
     >
       {/* 🔥 아래 보라빛 스캔 라인 */}
       <div className="pointer-events-none absolute inset-x-0 -bottom-[2px] h-[3px] overflow-hidden">
-        <div
-          className="
-            h-full w-full
-            bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0
-            bg-[length:200%_100%]
-            animate-header-border-sheen
-          "
-        />
+        <div className="h-full w-full bg-gradient-to-r from-violet-500/0 via-violet-400 to-violet-500/0 bg-[length:200%_100%] animate-header-border-sheen" />
       </div>
 
       {/* 🔵 로고 (왼쪽 고정) */}
       <div
-        className={`
-          absolute left-6 flex items-center gap-2
-          transform-gpu
-          transition-[opacity,transform] duration-500 ease-out
-          ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"}
-        `}
+        className={`absolute left-10 flex items-center gap-2 transform-gpu transition-[opacity,transform] duration-500 ease-out
+        ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"}`}
         style={{ transitionDelay: mounted ? "60ms" : "0ms" }}
       >
         <Link
@@ -76,11 +65,11 @@ export default function AppHeader() {
             alt="DKMV"
             width={24}
             height={24}
-            className="h-7 w-7 object-contain rounded-md"
+            className="h-12 w-12 object-contain rounded-md"
             loading="eager"
             decoding="async"
           />
-          <span className="font-bold tracking-wide text-slate-900 dark:text-slate-100">
+          <span className="text-3xl font-bold tracking-wide text-slate-900 dark:text-slate-100">
             DKMV
           </span>
         </Link>
@@ -88,38 +77,28 @@ export default function AppHeader() {
 
       {/* 🟣 중앙 네비게이션 */}
       <nav
-        className={`
-          flex-1 flex items-center justify-center text-sm font-medium gap-4
-          transform-gpu
-          transition-[opacity,transform] duration-500 ease-out
-          ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"}
-        `}
+        className={`flex-1 flex items-center justify-center text-sm font-medium gap-4
+        transform-gpu transition-[opacity,transform] duration-500 ease-out
+        ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"}`}
         style={{ transitionDelay: mounted ? "110ms" : "0ms" }}
       >
         {NAV_ITEMS.map((item, index) => {
           const Icon = item.icon;
-
           return (
             <Fragment key={item.to}>
-              {/* 아이템 사이 separator */}
               {index > 0 && (
                 <span
                   aria-hidden="true"
-                  className="h-5 w-px bg-slate-200/80 dark:bg-slate-700/80 rounded-full"
+                  className="h-7 w-px bg-slate-200/80 dark:bg-slate-700/80 rounded-full"
                 />
               )}
 
               <NavLink
                 to={item.to}
                 onClick={(e) => {
-                  // ✅ 대시보드 등 보호된 메뉴 접근 시 가드
                   if (item.requiresAuth && !isAuthenticated) {
                     e.preventDefault();
-
-                    // sonner 경고 토스트
                     toast.warning("로그인 후 이용 가능한 메뉴입니다.");
-
-                    // 원하면 로그인/회원가입 페이지로 보내기
                     navigate("/login");
                     return;
                   }
@@ -138,23 +117,11 @@ export default function AppHeader() {
                 }
               >
                 <span className="inline-flex items-center gap-1.5 overflow-hidden">
-                  {/* 👉 아이콘 */}
-                  <Icon
-                    className="
-                      h-5 w-5
-                      transition-transform duration-200 ease-out
-                    "
-                  />
-
-                  {/* 👉 텍스트 */}
+                  <Icon className="h-7 w-7 transition-transform duration-200 ease-out" />
                   <span
-                    className="
-                      text-[0.8rem]
-                      whitespace-nowrap
-                      max-w-0 opacity-0 translate-y-0.5
-                      group-hover:max-w-[6rem] group-hover:opacity-100 group-hover:translate-y-0
-                      transition-all duration-800 ease
-                    "
+                    className="text-[1rem] whitespace-nowrap max-w-0 opacity-0 translate-y-0.5
+                    group-hover:max-w-[6rem] group-hover:opacity-100 group-hover:translate-y-0
+                    transition-all duration-800 ease"
                   >
                     {item.label}
                   </span>
@@ -165,18 +132,14 @@ export default function AppHeader() {
         })}
       </nav>
 
-      {/* 🟡 우측 액션 : 다크모드 토글 + AuthMenu */}
+      {/* 🟡 우측 액션 */}
       <div
-        className={`
-          absolute right-6 flex items-center gap-2
-          transform-gpu
-          transition-[opacity,transform] duration-500 ease-out
-          ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"}
-        `}
+        className={`absolute right-6 flex items-center gap-2 transform-gpu transition-[opacity,transform] duration-500 ease-out
+        ${mounted ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"}`}
         style={{ transitionDelay: mounted ? "160ms" : "0ms" }}
       >
-        <AnimatedThemeToggler className=" cursor-pointer transition-transform duration-200 ease-out hover:scale-115" />
-        <AuthMenu />
+        <AnimatedThemeToggler className="cursor-pointer transition-transform duration-200 ease-out hover:scale-115" />
+        <AuthMenu className="ml-4" />
       </div>
     </header>
   );
