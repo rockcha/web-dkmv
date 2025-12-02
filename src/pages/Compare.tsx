@@ -274,7 +274,8 @@ export default function Compare() {
   }, [sortedStats, topCount]);
 
   const topSlots = useMemo<(ModelStats | null)[]>(() => {
-    const filled = [...topStats];
+    // ⭐ 여기서 filled 타입을 명시
+    const filled: (ModelStats | null)[] = [...topStats];
     while (filled.length < topCount) {
       filled.push(null);
     }

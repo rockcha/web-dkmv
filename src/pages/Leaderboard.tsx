@@ -376,7 +376,7 @@ export default function Leaderboard() {
                 <div className="flex items-center justify-between rounded-md border border-red-500/50 bg-red-950/40 px-3 py-2 text-xs text-red-200">
                   <span>랭킹 데이터를 불러오는 중 오류가 발생했어요.</span>
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="outline"
                     className="border-red-500/60 text-red-200 hover:bg-red-900/40"
                     onClick={() => window.location.reload()}
@@ -496,7 +496,7 @@ export default function Leaderboard() {
                 <div className="flex items-center justify-between rounded-md border border-red-500/50 bg-red-950/40 px-3 py-2 text-xs text-red-200">
                   <span>랭킹 데이터를 불러오는 중 오류가 발생했어요.</span>
                   <Button
-                    size="xs"
+                    size="sm"
                     variant="outline"
                     className="border-red-500/60 text-red-200 hover:bg-red-900/40"
                     onClick={() => window.location.reload()}
