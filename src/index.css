@@ -171,3 +171,15 @@
     animation: header-border-sheen 5s ease-in-out infinite;
   }
 }
+@keyframes logo-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-4px) scale(1.03);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.015);
+  }
+}

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Github } from "lucide-react";
+import { Github, Loader2 } from "lucide-react";
 import {
   startGithubLogin,
   startGithubLoginPopup,
@@ -24,6 +24,12 @@ export default function LoginPage() {
   // ✅ 순차 등장 애니메이션용
   const [mounted, setMounted] = useState(false);
 
+  // ✅ 현재 어떤 인증 액션 중인지
+  const [authAction, setAuthAction] = useState<"idle" | "login" | "connect">(
+    "idle"
+  );
+  const isActionLoading = authAction !== "idle" || isLoading;
+
   // ✅ oauth:success 한 번만 처리 (React StrictMode 이펙트 2번 방지)
   const handledRef = useRef(false);
 
@@ -42,22 +48,22 @@ export default function LoginPage() {
 
   // 🎯 실제 GitHub OAuth 로그인 (전체 페이지 리다이렉트)
   const handleGithubLogin = () => {
-    if (isLoading) return;
-    /**
-     * 👉 웹에서 직접 접속한 경우: state = "web" (기존 플로우 유지)
-     * 👉 익스텐션에서 /login?from=extension 으로 연 경우: state = "extension"
-     */
+    if (isActionLoading) return;
+
     const state = isExtensionFlow ? "extension" : "web";
-    startGithubLogin(state);
+    setAuthAction("login");
+    startGithubLogin(state); // 여기서 전체 페이지 리다이렉트
   };
 
   // 🎯 "처음이신가요? 계정 연동하기" → signup 팝업 플로우 실행 (웹에서만 사용)
   const handleGithubConnect = () => {
-    if (isLoading) return;
+    if (isActionLoading) return;
 
+    setAuthAction("connect");
     const popup = startGithubLoginPopup("signup");
 
     if (!popup || popup.closed) {
+      setAuthAction("idle");
       toast.error("팝업을 열 수 없습니다.", {
         description: "브라우저 팝업 차단 설정을 확인해주세요.",
       });
@@ -85,20 +91,20 @@ export default function LoginPage() {
         await refresh();
 
         if (status === "existing") {
-          // 이미 연동된 계정 → 다시 가입 아니라 “자동 로그인” 안내
           toast.info("이미 연동된 GitHub 계정입니다.", {
             description: "해당 계정으로 자동 로그인되었어요.",
           });
         } else {
-          // 새로 연동된 계정 → 계정 생성 + 자동 로그인 안내
           toast.success("GitHub 계정이 연동되었습니다.", {
             description: "DKMV 계정 생성 후 자동 로그인되었어요.",
           });
         }
 
+        setAuthAction("idle");
         navigate("/landing", { replace: true });
       } catch (err) {
         console.error("GitHub 연동 이후 상태 갱신 실패", err);
+        setAuthAction("idle");
         toast.error("연동 상태를 불러오지 못했습니다.", {
           description: "잠시 후 다시 시도해주세요.",
         });
@@ -172,13 +178,7 @@ export default function LoginPage() {
                   transition-transform duration-300
                   hover:-translate-y-0.5 hover:rotate-3 hover:scale-105
                 "
-              >
-                <img
-                  src="/logo.png"
-                  alt="DKMV"
-                  className="h-12 w-12 object-contain"
-                />
-              </div>
+              ></div>
               <div className="flex flex-col gap-1">
                 <span className="text-xs tracking-[0.3em] uppercase text-slate-500 dark:text-slate-400">
                   DKMV
@@ -233,7 +233,7 @@ export default function LoginPage() {
                 <img
                   src="/images/login_image.png"
                   alt="DKMV 로그인 일러스트"
-                  className="w-full mr-8 max-w-xs aspect-square object-contain transform -scale-x-100"
+                  className="w-full mr-8 max-w-xs aspect-square object-contain "
                 />
               </div>
             </section>
@@ -293,10 +293,19 @@ export default function LoginPage() {
                     disabled:opacity-60 disabled:cursor-not-allowed
                   "
                   onClick={handleGithubLogin}
-                  disabled={isLoading}
+                  disabled={isActionLoading}
                 >
-                  <Github className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
-                  GitHub로 로그인하기
+                  {authAction === "login" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      GitHub로 로그인 중...
+                    </>
+                  ) : (
+                    <>
+                      <Github className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" />
+                      GitHub로 로그인하기
+                    </>
+                  )}
                 </Button>
               </div>
 
@@ -331,6 +340,7 @@ export default function LoginPage() {
                     active:translate-y-[1px]
                   "
                   onClick={() => navigate("/landing")}
+                  disabled={isActionLoading}
                 >
                   홈으로
                 </Button>
@@ -353,9 +363,16 @@ export default function LoginPage() {
                       active:translate-y-[1px]
                     "
                     onClick={handleGithubConnect}
-                    disabled={isLoading}
+                    disabled={isActionLoading}
                   >
-                    처음이신가요? 계정 연동하기
+                    {authAction === "connect" ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        GitHub 계정 연동 중...
+                      </>
+                    ) : (
+                      "처음이신가요? 계정 연동하기"
+                    )}
                   </Button>
                 )}
               </div>

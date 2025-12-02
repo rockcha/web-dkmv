@@ -1,7 +1,7 @@
 // src/pages/Playground.tsx
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,35 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 /* Lucide 아이콘 */
-import { Gauge, FileText, BarChart3, Info, Loader2 } from "lucide-react"; // ✅ Info, Loader2 추가
+import {
+  Gauge,
+  FileText,
+  BarChart3,
+  Info,
+  Loader2,
+  ChevronsUpDown,
+  Search,
+  Cpu,
+  Check,
+} from "lucide-react";
+
+/* 검색용 콤보박스 UI */
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
+
+/* 모델 리스트 (실제 백엔드용 ID들) */
+import { MODEL_OPTIONS, type ModelOption } from "@/constants/modelOptions";
 
 const SAMPLES: Record<string, string> = {
   ex1: `# 리스트 원소 두 배 만들기 (Python)
@@ -46,12 +74,6 @@ def factorial(n: int) -> int:
 print(factorial(5))
 `,
 };
-
-const MODEL_OPTIONS = [
-  { id: "gpt-4o-mini", label: "GPT-4o mini" },
-  { id: "starcoder-15b", label: "StarCoder 15B" },
-  { id: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
-];
 
 type Phase =
   | "idle"
@@ -172,12 +194,136 @@ function getCategoryColor(category: string): string {
   }
 }
 
+/**
+ * 모델 라벨 예쁘게 포맷팅
+ * - provider: openai
+ * - name: gpt-5.1-codex
+ */
+function formatModelName(model: ModelOption) {
+  const parts = model.id.split("/");
+  const provider = parts[0] ?? "unknown";
+  const name = parts.slice(1).join("/") || model.id;
+  return { provider, name };
+}
+
+/**
+ * 검색 가능한 모델 선택 콤보 박스
+ */
+type ModelSearchComboboxProps = {
+  value: string | null;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+};
+
+function ModelSearchCombobox({
+  value,
+  onChange,
+  disabled,
+}: ModelSearchComboboxProps) {
+  const [open, setOpen] = useState(false);
+
+  const sortedModels = useMemo(
+    () =>
+      [...MODEL_OPTIONS].sort((a, b) => {
+        const pa = a.provider.localeCompare(b.provider);
+        if (pa !== 0) return pa;
+        return a.id.localeCompare(b.id);
+      }),
+    []
+  );
+
+  const selectedModel = useMemo(
+    () => sortedModels.find((m) => m.id === value) ?? null,
+    [sortedModels, value]
+  );
+
+  const selectedMeta = selectedModel ? formatModelName(selectedModel) : null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className="w-full justify-between text-xs md:text-sm"
+        >
+          <div className="flex items-center gap-2 truncate">
+            <Cpu className="h-4 w-4 text-violet-400" />
+            {selectedModel ? (
+              <div className="flex flex-col text-left">
+                <span className="truncate text-xs font-medium md:text-sm">
+                  {selectedMeta?.name}
+                </span>
+                <span className="text-[10px] uppercase text-slate-500">
+                  {selectedMeta?.provider}
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                사용할 모델을 검색해서 선택하세요
+              </span>
+            )}
+          </div>
+          <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[320px] p-0" align="end">
+        <Command>
+          <CommandInput
+            placeholder="모델 이름 / provider 검색..."
+            className="text-xs"
+          />
+          <CommandList>
+            <CommandEmpty className="py-6 text-center text-xs text-muted-foreground">
+              검색 결과가 없습니다.
+            </CommandEmpty>
+            <CommandGroup heading="모델 목록" className="text-[11px]">
+              {sortedModels.map((model) => {
+                const { provider, name } = formatModelName(model);
+                const isSelected = model.id === value;
+                return (
+                  <CommandItem
+                    key={model.id}
+                    value={`${model.id} ${provider} ${name}`}
+                    onSelect={() => {
+                      onChange(model.id);
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-2 text-xs"
+                  >
+                    <span className="inline-flex h-5 items-center rounded-full bg-slate-800 px-2 text-[10px] font-mono uppercase text-slate-200">
+                      {provider}
+                    </span>
+                    <span className="truncate">{name}</span>
+                    {isSelected && (
+                      <Check className="ml-auto h-3.5 w-3.5 text-violet-400" />
+                    )}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function Playground() {
   const { user } = useAuth();
 
   const [selected, setSelected] = useState<string>();
   const [code, setCode] = useState<string>("");
-  const [modelId, setModelId] = useState<string>(MODEL_OPTIONS[0].id);
+
+  // 기본 모델: openai 계열 중 하나, 없으면 첫 번째
+  const defaultModelId =
+    MODEL_OPTIONS.find((m) => m.id.startsWith("openai/"))?.id ??
+    MODEL_OPTIONS[0]?.id ??
+    "";
+  const [modelId, setModelId] = useState<string>(defaultModelId);
 
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -199,7 +345,7 @@ export default function Playground() {
     setCode(SAMPLES[val] ?? "");
   };
 
-  const canRun = code.trim().length > 0 && !loading && !!user;
+  const canRun = code.trim().length > 0 && !loading && !!user && !!modelId;
 
   const run = async () => {
     setError(null);
@@ -220,6 +366,13 @@ export default function Playground() {
       setError(
         "현재 사용자 github_id를 찾을 수 없습니다. 다시 로그인 후 시도해 주세요."
       );
+      setLoading(false);
+      setPhase("error");
+      return;
+    }
+
+    if (!modelId) {
+      setError("사용할 모델을 먼저 선택해 주세요.");
       setLoading(false);
       setPhase("error");
       return;
@@ -379,7 +532,6 @@ export default function Playground() {
   // ========================
   // 4영역 뷰어용 데이터
   // ========================
-  // const meta: ReviewMeta = reviewDetail?.meta ?? {};
   const body: ReviewBody | null = reviewDetail?.body ?? null;
 
   const qualityScoreRaw = body?.quality_score ?? null;
@@ -404,19 +556,26 @@ export default function Playground() {
         )
       : [];
 
-  const isLoadingPhase = phase === "requesting" || phase === "fetching"; // ✅ UX용 플래그
+  const isLoadingPhase = phase === "requesting" || phase === "fetching";
+
+  const currentModel = useMemo(
+    () => MODEL_OPTIONS.find((m) => m.id === modelId) ?? null,
+    [modelId]
+  );
+  const currentModelMeta = currentModel ? formatModelName(currentModel) : null;
 
   return (
     <div className="space-y-6">
-      {/* ✅ 최상단: 사용법 안내 */}
-      <div className="flex items-start gap-2 rounded-lg border border-dashed border-slate-700 bg-slate-950/60 px-3 py-2 text-[11px] text-muted-foreground">
+      {/* ✅ 최상단: 사용법 + 모델 선택 안내 */}
+      <div className="flex items-start gap-3 rounded-lg border border-dashed border-slate-700 bg-slate-950/60 px-3 py-2 text-[11px] text-muted-foreground">
         <Info className="mt-0.5 h-4 w-4 text-sky-400" />
         <div className="space-y-1">
           <p className="font-medium text-sky-100">사용 방법</p>
           <ul className="list-disc space-y-0.5 pl-4">
-            <li>위에서 샘플 코드를 선택하거나 직접 코드를 붙여넣습니다.</li>
+            <li>왼쪽에서 샘플 코드를 선택하거나 직접 코드를 붙여넣습니다.</li>
             <li>
-              사용할 모델을 선택한 뒤, &quot;리뷰 생성 요청&quot;을 눌러요.
+              오른쪽에서 <b>모델을 검색하여 선택</b>한 뒤, &quot;리뷰 생성
+              요청&quot; 버튼을 누릅니다.
             </li>
             <li>
               아래 카드에서 전체 점수 · 요약 · 카테고리별 코멘트를 확인할 수
@@ -430,10 +589,15 @@ export default function Playground() {
       <Card>
         <CardContent className="space-y-4">
           {/* 샘플 / 모델 선택 */}
-          <div className="flex flex-col gap-3 md:flex-row">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            {/* 샘플 선택 */}
             <div className="flex-1">
+              <p className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <FileText className="h-3.5 w-3.5 text-sky-400" />
+                코드 샘플
+              </p>
               <Select onValueChange={onPick} value={selected}>
-                <SelectTrigger>
+                <SelectTrigger className="text-xs md:text-sm">
                   <SelectValue placeholder="코드 블록 선택" />
                 </SelectTrigger>
                 <SelectContent>
@@ -444,25 +608,21 @@ export default function Playground() {
               </Select>
             </div>
 
-            <div className="md:max-w-xs">
-              <div className="flex items-center gap-4">
-                <p className="text-sm">사용한 모델</p>
-                <Select value={modelId} onValueChange={setModelId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="모델 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MODEL_OPTIONS.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* 모델 검색 선택 */}
+            <div className="w-full md:w-[340px]">
+              <p className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <Search className="h-3.5 w-3.5 text-violet-400" />
+                사용할 모델 검색
+              </p>
+              <ModelSearchCombobox
+                value={modelId || null}
+                onChange={setModelId}
+                disabled={loading}
+              />
             </div>
           </div>
 
+          {/* 코드 입력 */}
           <Textarea
             className="min-h-[220px] font-mono text-sm"
             placeholder="여기에 코드를 붙여넣거나 샘플을 선택하세요. (language는 항상 python으로 전송)"
@@ -470,10 +630,10 @@ export default function Playground() {
             onChange={(e) => setCode(e.target.value)}
           />
 
+          {/* 실행 컨트롤 */}
           <div className="flex flex-col justify-end gap-2">
             <div className="flex flex-wrap items-center gap-2 ">
               <Button disabled={!canRun} onClick={run}>
-                {/* ✅ 로딩 시 스피너 + 텍스트 */}
                 {loading && (
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                 )}
@@ -486,6 +646,18 @@ export default function Playground() {
               {!user && (
                 <span className="text-xs text-red-400">
                   * 로그인 후에만 요청을 보낼 수 있습니다.
+                </span>
+              )}
+
+              {currentModelMeta && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-950/70 px-2 py-1 text-[10px] text-slate-300">
+                  <Cpu className="h-3 w-3 text-violet-400" />
+                  <span className="uppercase text-[9px] text-slate-400">
+                    {currentModelMeta.provider}
+                  </span>
+                  <span className="truncate max-w-[140px]">
+                    {currentModelMeta.name}
+                  </span>
                 </span>
               )}
             </div>
@@ -518,12 +690,14 @@ export default function Playground() {
           "overflow-hidden transition-all",
           isLoadingPhase &&
             "border-emerald-500/60 shadow-[0_0_0_1px_rgba(16,185,129,0.45)]"
-        )} // ✅ 로딩 중일 때 테두리/그림자 강조
+        )}
       >
         <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle>리뷰 결과</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+            <BarChart3 className="h-4 w-4 text-violet-400" />
+            리뷰 결과
+          </CardTitle>
 
-          {/* ✅ 상단 우측에 '분석 중' 뱃지 */}
           {isLoadingPhase && (
             <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-300">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -532,10 +706,8 @@ export default function Playground() {
           )}
         </CardHeader>
         <CardContent>
-          {/* ✅ 내용도 로딩 상태에 따라 다르게 */}
           {!reviewDetail || !body ? (
             isLoadingPhase ? (
-              // 🔥 로딩 스켈레톤 (아직 리뷰 결과 없고, 요청 중일 때)
               <div className="rounded-md border border-slate-800 bg-slate-950/60 p-4">
                 <div className="space-y-3 text-[11px]">
                   <div className="h-3 w-32 rounded bg-slate-800 animate-pulse" />
@@ -555,7 +727,7 @@ export default function Playground() {
               className={cn(
                 "space-y-6",
                 isLoadingPhase && "pointer-events-none opacity-80"
-              )} // ✅ 로딩 중일 때 약간 흐리게
+              )}
             >
               {/* 레이아웃: 왼쪽(총점+요약) / 오른쪽(카테고리 4줄) */}
               <div className="grid gap-4 lg:grid-cols-2">
@@ -594,13 +766,13 @@ export default function Playground() {
                         요약
                       </span>
                     </div>
-                    <ScrollArea className="mt-1 max-h-48 rounded-md  p-3 text-xs leading-relaxed">
+                    <ScrollArea className="mt-1 max-h-48 rounded-md p-3 text-xs leading-relaxed">
                       {summaryText || "요약 정보가 없습니다."}
                     </ScrollArea>
                   </div>
                 </div>
 
-                {/* 오른쪽 컬럼: 카테고리별 점수(도넛) + 코멘트 한 줄씩 */}
+                {/* 오른쪽 컬럼: 카테고리별 점수 + 코멘트 */}
                 <div className="space-y-4">
                   <div className="flex flex-col rounded-xl border bg-slate-950/40 p-4">
                     <div className="mb-2 flex items-center justify-between">
@@ -613,11 +785,10 @@ export default function Playground() {
                     </div>
 
                     {!scoresByCategory && !comments ? (
-                      <div className="mt-1 rounded-md  p-3 text-xs text-muted-foreground">
+                      <div className="mt-1 rounded-md p-3 text-xs text-muted-foreground">
                         카테고리별 점수/코멘트 정보가 없습니다.
                       </div>
                     ) : (
-                      // ScrollArea 대신 내용만큼 높이 늘어나는 리스트
                       <div className="mt-1 space-y-3 text-xs">
                         {availableCategories.map((key) => {
                           const v =
@@ -638,9 +809,8 @@ export default function Playground() {
                           return (
                             <div
                               key={key}
-                              className="flex items-start gap-3 rounded-md  px-3 py-2"
+                              className="flex items-start gap-3 rounded-md px-3 py-2"
                             >
-                              {/* 도넛 (작게) */}
                               <DonutScore
                                 value={numeric}
                                 size={70}
@@ -650,7 +820,6 @@ export default function Playground() {
                                 className="mt-1 shrink-0"
                               />
 
-                              {/* 텍스트 영역 */}
                               <div className="flex-1 space-y-1">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[11px] font-semibold capitalize">

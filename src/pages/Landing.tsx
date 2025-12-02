@@ -126,18 +126,6 @@ export default function Landing() {
                     lg:justify-start
                   "
                 >
-                  <img
-                    src="/logo3d.png"
-                    alt="DKMV"
-                    width={64}
-                    height={64}
-                    className="
-                      h-10 w-10 sm:h-18 sm:w-18
-                      object-contain
-                    "
-                    loading="eager"
-                    decoding="async"
-                  />
                   <span className="flex items-center gap-3">
                     Don’t Kill My Vibe
                     <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/50 bg-violet-500/10 px-2 py-0.5 text-[0.65rem] font-semibold text-violet-700 dark:text-violet-200">

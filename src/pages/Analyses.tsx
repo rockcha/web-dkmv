@@ -2,8 +2,9 @@
 "use client";
 
 import * as React from "react";
-import { fetchReviews } from "@/lib/reviewsApi";
-import { useAuth } from "@/features/auth/AuthContext";
+
+import { useReviews } from "@/lib/useReviews";
+import type { CategoryKey, ReviewItem } from "@/lib/useReviews";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -28,36 +29,14 @@ import {
   Gauge,
   Trophy,
   Clock,
+  LayoutGrid,
 } from "lucide-react";
 
 /* ===========================================================
-   🔹 타입 정의
+   🔹 타입 / 뷰 모드
 =========================================================== */
 
-type CategoryKey = "bug" | "maintainability" | "style" | "security";
-
-type ScoresByCategory = Record<CategoryKey, number>;
-
-type CommentsByCategory = Partial<Record<CategoryKey, string>> &
-  Record<string, string>;
-
-type ReviewItem = {
-  review_id: number;
-  github_id: string | null;
-  model: string;
-  trigger: string | null;
-  language: string | null;
-  quality_score: number;
-  summary: string;
-  scores_by_category: ScoresByCategory;
-  comments: CommentsByCategory;
-  audit: string;
-};
-
-type ReviewListResponse = {
-  meta: unknown;
-  body: ReviewItem[];
-};
+type ViewMode = "detailed" | "compact";
 
 /* ===========================================================
    🔹 카테고리 설정
@@ -130,43 +109,21 @@ function formatAudit(audit: string) {
 =========================================================== */
 
 export default function Analyses() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-
-  const [allReviews, setAllReviews] = React.useState<ReviewItem[]>([]);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState("");
+  const {
+    myReviews,
+    error,
+    isInitialLoading,
+    isAuthenticated,
+    authLoading,
+    reload: load,
+  } = useReviews();
 
   // 헤더에서 쓸 정렬/모델 필터
   const [sortBy, setSortBy] = React.useState<"latest" | "score">("latest");
   const [modelFilter, setModelFilter] = React.useState<string>("__all__");
 
-  /* ------------------------ 데이터 로드 ------------------------ */
-
-  const load = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const res = (await fetchReviews()) as ReviewListResponse;
-      setAllReviews(Array.isArray(res.body) ? res.body : []);
-    } catch (e: any) {
-      setError(String(e?.message || e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    void load();
-  }, [load]);
-
-  /* ------------------------ 내 리뷰만 (A 전략) ------------------------ */
-
-  const myGithubId = user?.github_id ?? null;
-
-  const myReviews = React.useMemo(() => {
-    if (!myGithubId) return [];
-    return allReviews.filter((r) => r.github_id === myGithubId);
-  }, [allReviews, myGithubId]);
+  // 🔹 보기 방식 (자세히 / 여러개)
+  const [viewMode, setViewMode] = React.useState<ViewMode>("detailed");
 
   /* ------------------------ 파생 데이터 ------------------------ */
 
@@ -177,7 +134,7 @@ export default function Analyses() {
   }, [myReviews]);
 
   const filtered = React.useMemo(() => {
-    let arr = [...myReviews];
+    let arr: ReviewItem[] = [...myReviews];
 
     // 모델별 필터
     if (modelFilter !== "__all__") {
@@ -213,8 +170,6 @@ export default function Analyses() {
     return { total, avg, best, worst };
   }, [myReviews]);
 
-  const isInitialLoading = authLoading || loading;
-
   /* ===========================================================
      🔹 로그인 안 된 경우
   ============================================================ */
@@ -245,11 +200,11 @@ export default function Analyses() {
   ============================================================ */
 
   return (
-    <div className=" pb-20">
+    <div className="pb-20">
       {/* 1. 상단 헤더 + 컨트롤 바 */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
-          <h2 className=" text-xl font-semibold">리뷰 요약</h2>
+          <h2 className="text-xl font-semibold">리뷰 요약</h2>
         </div>
 
         <Card className="w-full max-w-md border-none bg-transparent md:w-auto">
@@ -300,7 +255,7 @@ export default function Analyses() {
 
       {/* 2. 상단 요약 카드 */}
       {stats && (
-        <Card className="bg-gradient-to-r from-violet-500/5 via-background to-background border-violet-500/20">
+        <Card className="border-violet-500/20 bg-gradient-to-r from-violet-500/5 via-background to-background">
           <CardContent className="grid gap-4 p-5 md:grid-cols-4">
             {/* 총 리뷰 수 */}
             <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-3">
@@ -404,8 +359,44 @@ export default function Analyses() {
 
       {/* 3. 리스트 영역 */}
       <div>
-        <div className="mt-8 mb-3 flex items-center justify-between">
-          <h2 className=" text-xl font-semibold">리뷰 목록</h2>
+        {/* 🔹 제목 + 보기 방식 토글 한 줄 */}
+        <div className="mt-8 mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-xl font-semibold">리뷰 목록</h2>
+
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              보기 방식
+            </span>
+            <div className="inline-flex items-center gap-1 rounded-full bg-muted p-1">
+              <Button
+                size="sm"
+                variant={viewMode === "detailed" ? "default" : "ghost"}
+                className={cn(
+                  "h-8 gap-1 rounded-full px-3 text-xs cursor-pointer",
+                  viewMode === "detailed" &&
+                    "bg-violet-500 text-white hover:bg-violet-600"
+                )}
+                onClick={() => setViewMode("detailed")}
+              >
+                <ListChecks className="h-3.5 w-3.5" />
+                <span>자세히 보기</span>
+              </Button>
+
+              <Button
+                size="sm"
+                variant={viewMode === "compact" ? "default" : "ghost"}
+                className={cn(
+                  "h-8 gap-1 rounded-full px-3 text-xs cursor-pointer",
+                  viewMode === "compact" &&
+                    "bg-violet-500 text-white hover:bg-violet-600 "
+                )}
+                onClick={() => setViewMode("compact")}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span>요약 모아보기</span>
+              </Button>
+            </div>
+          </div>
         </div>
 
         {error && (
@@ -466,28 +457,153 @@ export default function Analyses() {
           </Card>
         )}
 
-        {/* 🔹 카드 2열 그리드 (작을 땐 1열) */}
+        {/* 🔹 카드 2열 / 요약 모드일 때는 더 촘촘하게 */}
         {!isInitialLoading && filtered.length > 0 && (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div
+            className={cn(
+              "mt-4 grid gap-4",
+              viewMode === "detailed"
+                ? "md:grid-cols-2"
+                : "sm:grid-cols-2 lg:grid-cols-3"
+            )}
+          >
             {filtered.map((item) => {
               const tone = qualityTone(item.quality_score);
 
+              // 🔹 자세히 보기 모드
+              if (viewMode === "detailed") {
+                return (
+                  <Card
+                    key={item.review_id}
+                    className={cn(
+                      "group border border-slate-200 bg-white shadow-sm",
+                      "dark:border-slate-800 dark:bg-slate-900/40"
+                    )}
+                  >
+                    <CardHeader className="border-b border-slate-100 pb-3 dark:border-slate-800">
+                      <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+                        {/* Quality 숫자 강조 */}
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-mono text-2xl font-semibold">
+                            {item.quality_score}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            /100
+                          </span>
+                          <span
+                            className={cn(
+                              "ml-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                              tone.className
+                            )}
+                          >
+                            {tone.label}
+                          </span>
+                        </div>
+
+                        {/* 메타 정보: 모델 */}
+                        <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                          {item.model && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[14px] font-medium text-violet-600 dark:text-white">
+                              <Bot className="h-5 w-5" />
+                              {item.model}
+                            </span>
+                          )}
+                        </div>
+                      </CardTitle>
+
+                      <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Clock className="h-3 w-3 text-violet-500" />
+                        <span>{formatAudit(item.audit)}</span>
+                      </div>
+                    </CardHeader>
+
+                    {/* 🔹 카드 내용은 일정 높이 넘어가면 스크롤 */}
+                    <CardContent className="mt-1 max-h-80 space-y-4 overflow-y-auto pr-1 text-sm">
+                      {/* 요약 */}
+                      <div>
+                        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          리뷰 요약
+                        </div>
+                        <p className="line-clamp-4 leading-relaxed text-slate-800 dark:text-slate-100">
+                          {item.summary}
+                        </p>
+                      </div>
+
+                      {/* Category breakdown */}
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-[11px] font-semibold uppercase text-muted-foreground">
+                            유형별 점수 및 코멘트
+                          </span>
+                        </div>
+
+                        <div className="grid gap-2">
+                          {CATEGORY_KEYS.map((key) => {
+                            const Icon = CATEGORY_ICONS[key];
+                            const score = item.scores_by_category[key];
+                            const comment = item.comments[key];
+
+                            const hasData =
+                              typeof score === "number" || !!comment;
+                            if (!hasData) return null;
+
+                            return (
+                              <div
+                                key={key}
+                                className="rounded-lg bg-white p-2 shadow-sm dark:bg-slate-950/40"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500/10">
+                                      <Icon className="h-3.5 w-3.5 text-violet-500" />
+                                    </div>
+                                    <span className="text-xs font-medium">
+                                      {CATEGORY_LABELS[key]}
+                                    </span>
+                                  </div>
+
+                                  {/* 점수 숫자로 명확하게 */}
+                                  {typeof score === "number" && (
+                                    <Badge
+                                      variant="outline"
+                                      className="font-mono text-[10px]"
+                                    >
+                                      {score}/100
+                                    </Badge>
+                                  )}
+                                </div>
+
+                                {comment && (
+                                  <p className="mt-1 whitespace-pre-wrap text-[11px] text-muted-foreground">
+                                    {comment}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              }
+
+              // 🔹 요약 모아보기 모드 (총점 + 유형별 점수만)
               return (
                 <Card
                   key={item.review_id}
                   className={cn(
-                    "group border border-slate-200 bg-white shadow-sm transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-md",
+                    "border border-slate-200 bg-white shadow-sm",
                     "dark:border-slate-800 dark:bg-slate-900/40"
                   )}
                 >
-                  <CardHeader className="border-b border-slate-100 pb-3 dark:border-slate-800">
-                    <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
-                      {/* Quality 숫자 강조 */}
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center justify-between gap-2 text-sm">
                       <div className="flex items-baseline gap-1">
-                        <span className="font-mono text-2xl font-semibold">
+                        <span className="font-mono text-xl font-semibold">
                           {item.quality_score}
                         </span>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[11px] text-muted-foreground">
                           /100
                         </span>
                         <span
@@ -500,88 +616,49 @@ export default function Analyses() {
                         </span>
                       </div>
 
-                      {/* 메타 정보: 모델 / 언어 */}
-                      <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-                        {item.model && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[14px] font-medium text-violet-600 dark:text-white">
-                            <Bot className="h-5 w-5" />
-                            {item.model}
-                          </span>
-                        )}
-                      </div>
+                      {item.model && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-600 dark:text-white">
+                          <Bot className="h-3.5 w-3.5" />
+                          {item.model}
+                        </span>
+                      )}
                     </CardTitle>
 
-                    <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                       <Clock className="h-3 w-3 text-violet-500" />
                       <span>{formatAudit(item.audit)}</span>
                     </div>
                   </CardHeader>
 
-                  {/* 🔹 카드 내용은 일정 높이 넘어가면 스크롤 */}
-                  <CardContent className="mt-1 max-h-80 space-y-4 overflow-y-auto pr-1 text-sm">
-                    {/* 요약 */}
-                    <div>
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        리뷰 요약
-                      </div>
-                      <p className="line-clamp-4 leading-relaxed text-slate-800 dark:text-slate-100">
-                        {item.summary}
-                      </p>
+                  <CardContent className="space-y-2 p-3 text-xs">
+                    <div className="text-[11px] font-semibold uppercase text-muted-foreground">
+                      유형별 점수
                     </div>
+                    <div className="grid gap-1.5">
+                      {CATEGORY_KEYS.map((key) => {
+                        const Icon = CATEGORY_ICONS[key];
+                        const score = item.scores_by_category[key];
+                        if (typeof score !== "number") return null;
 
-                    {/* Category breakdown */}
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40">
-                      <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[11px] font-semibold uppercase text-muted-foreground">
-                          유형별 점수 및 코멘트
-                        </span>
-                      </div>
-
-                      <div className="grid gap-2">
-                        {CATEGORY_KEYS.map((key) => {
-                          const Icon = CATEGORY_ICONS[key];
-                          const score = item.scores_by_category[key];
-                          const comment = item.comments[key];
-
-                          const hasData =
-                            typeof score === "number" || !!comment;
-                          if (!hasData) return null;
-
-                          return (
-                            <div
-                              key={key}
-                              className="rounded-lg bg-white p-2 shadow-sm dark:bg-slate-950/40"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-500/10">
-                                    <Icon className="h-3.5 w-3.5 text-violet-500" />
-                                  </div>
-                                  <span className="text-xs font-medium">
-                                    {CATEGORY_LABELS[key]}
-                                  </span>
-                                </div>
-
-                                {/* 점수 숫자로 명확하게 */}
-                                {typeof score === "number" && (
-                                  <Badge
-                                    variant="outline"
-                                    className="font-mono text-[10px]"
-                                  >
-                                    {score}/100
-                                  </Badge>
-                                )}
+                        return (
+                          <div
+                            key={key}
+                            className="flex items-center justify-between rounded-lg border border-slate-200 bg-background/60 px-2 py-1 dark:border-slate-800"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/10">
+                                <Icon className="h-3 w-3 text-violet-500" />
                               </div>
-
-                              {comment && (
-                                <p className="mt-1 whitespace-pre-wrap text-[11px] text-muted-foreground">
-                                  {comment}
-                                </p>
-                              )}
+                              <span className="text-[11px]">
+                                {CATEGORY_LABELS[key]}
+                              </span>
                             </div>
-                          );
-                        })}
-                      </div>
+                            <span className="font-mono text-[11px]">
+                              {score}/100
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>

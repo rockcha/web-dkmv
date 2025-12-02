@@ -65,7 +65,7 @@ export default function AppHeader() {
             alt="DKMV"
             width={24}
             height={24}
-            className="h-16 w-16 object-contain rounded-md"
+            className="h-16 w-16 object-contain rounded-md transform-gpu animate-[logo-bounce_3.2s_ease-in-out_infinite]"
             loading="eager"
             decoding="async"
           />
