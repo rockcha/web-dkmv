@@ -61,11 +61,11 @@ export default function AppHeader() {
           className="inline-flex items-center gap-2 select-none"
         >
           <img
-            src="/logo.png"
+            src="/logo3d.png"
             alt="DKMV"
             width={24}
             height={24}
-            className="h-12 w-12 object-contain rounded-md"
+            className="h-16 w-16 object-contain rounded-md"
             loading="eager"
             decoding="async"
           />

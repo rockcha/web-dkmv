@@ -127,13 +127,13 @@ export default function Landing() {
                   "
                 >
                   <img
-                    src="/logo.png"
+                    src="/logo3d.png"
                     alt="DKMV"
-                    width={40}
-                    height={40}
+                    width={64}
+                    height={64}
                     className="
-                      h-9 w-9 sm:h-10 sm:w-10
-                      rounded-md object-contain
+                      h-10 w-10 sm:h-18 sm:w-18
+                      object-contain
                     "
                     loading="eager"
                     decoding="async"
