@@ -1,14 +1,9 @@
 // src/lib/reviewsApi.ts
 
-// ===== 경로 상수 =====
-
-// 1) 목록용: 구 DB 라우터 (GET /v1/reviews?limit=...)
-const LIST_BASE = "/v1";
-const LIST_PATH = "/reviews";
-
-// 2) 단일 리뷰 실행용: 새 review-api (POST /api/v1/review)
-const REVIEW_API_BASE = "/api";
-const REVIEW_API_PATH = "/v1/review";
+// 🔹 백엔드 BASE URL
+//   - 로컬: 없으면 getOrigin() 사용 (지금처럼 3000에서 프록시 쓸 때)
+//   - Vercel: VITE_REVIEW_API_BASE_URL 에 예: "http://18.205.229.159:8000"
+const API_BASE = import.meta.env.VITE_REVIEW_API_BASE_URL ?? getOrigin();
 
 // 공통: 브라우저/SSR 양쪽에서 base URL 계산
 function getOrigin() {
@@ -22,48 +17,68 @@ function getOrigin() {
  * ➜ Analyses 페이지에서 사용
  */
 export async function fetchReviews(limit = 50) {
-  const base = getOrigin();
-  const url = new URL(`${LIST_BASE}${LIST_PATH}`, base);
+  const url = new URL("/v1/reviews", API_BASE);
   url.searchParams.set("limit", String(limit));
 
   const res = await fetch(url.toString(), {
     method: "GET",
-    // 🔓 목록은 인증 없이도 열어둘거면 헤더 없음
-    // credentials: "include", // 쿠키 인증 쓰면 주석 해제
+    headers: {
+      Accept: "application/json",
+    },
+    // credentials: "include", // 쿠키 쓰면 주석 해제
   });
 
+  const text = await res.text().catch(() => "");
+
   if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`GET ${LIST_PATH} -> ${res.status}: ${t}`);
+    throw new Error(`GET /v1/reviews -> ${res.status}: ${text.slice(0, 120)}`);
   }
 
-  return res.json();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // 🔥 여기서 지금 뜨던 "<!DOCTYPE ..." 같은 경우를 잡아줌
+    throw new Error(
+      `GET /v1/reviews 응답이 JSON이 아닙니다. preview: ${text
+        .slice(0, 120)
+        .replace(/\s+/g, " ")}`
+    );
+  }
 }
 
 /**
  * 단일 코드 리뷰 실행
  * POST /api/v1/review
- * ➜ 필요하면 Playground 나 디버그 용도에서 사용
+ * ➜ Playground / 디버그 용
  */
 export async function createReviewRaw(payload: unknown) {
-  const base = getOrigin();
-  const url = new URL(`${REVIEW_API_BASE}${REVIEW_API_PATH}`, base);
+  const url = new URL("/api/v1/review", API_BASE);
 
   const res = await fetch(url.toString(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      // Authorization 필요하면 여기서 붙이면 됨
-      // ...authHeader(),
+      Accept: "application/json",
     },
     body: JSON.stringify(payload),
     // credentials: "include",
   });
 
+  const text = await res.text().catch(() => "");
+
   if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`POST ${REVIEW_API_PATH} -> ${res.status}: ${t}`);
+    throw new Error(
+      `POST /api/v1/review -> ${res.status}: ${text.slice(0, 120)}`
+    );
   }
 
-  return res.json();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      `POST /api/v1/review 응답이 JSON이 아닙니다. preview: ${text
+        .slice(0, 120)
+        .replace(/\s+/g, " ")}`
+    );
+  }
 }
