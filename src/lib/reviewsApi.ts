@@ -37,7 +37,6 @@ export async function fetchReviews(limit = 50) {
   try {
     return JSON.parse(text);
   } catch {
-    // 🔥 여기서 지금 뜨던 "<!DOCTYPE ..." 같은 경우를 잡아줌
     throw new Error(
       `GET /v1/reviews 응답이 JSON이 아닙니다. preview: ${text
         .slice(0, 120)
