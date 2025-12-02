@@ -111,7 +111,7 @@ export default function AppHeader() {
                     "after:absolute after:inset-x-2 after:-bottom-1 after:h-0.5 after:rounded-full",
                     "after:bg-violet-500 after:scale-x-0 after:origin-center after:transition-transform after:duration-200",
                     isActive
-                      ? "text-violet-500 dark:text-violet-400 after:scale-x-100 bg-violet-500/5 dark:bg-violet-500/10"
+                      ? "text-violet-500 dark:text-white/80 after:scale-x-100 bg-violet-500/5 dark:bg-violet-500/10"
                       : "",
                   ].join(" ")
                 }

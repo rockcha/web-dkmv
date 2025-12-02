@@ -180,7 +180,7 @@ export default function AppLayout() {
                               const hoverCollapsed = "hover:bg-transparent"; // 접혔을 땐 배경 그대로
 
                               const activeBase = isActive
-                                ? "font-semibold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40"
+                                ? "font-semibold text-violet-600 dark:text-white bg-violet-50 dark:bg-violet-950/40"
                                 : "text-slate-600 dark:text-slate-300";
 
                               return [
