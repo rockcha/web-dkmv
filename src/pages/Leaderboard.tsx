@@ -1,113 +1,172 @@
 // src/pages/Leaderboard.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/features/auth/AuthContext";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import {
-  Medal,
-  Trophy,
-  Github,
-  TrendingUp,
-  ArrowUpRight,
-  User2,
-} from "lucide-react";
+import { Github } from "lucide-react";
 
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { fetchUserStats, type UserStatsApiItem } from "@/api/userStats";
+import { fetchUsers, type RawUser } from "@/api/users";
 
 /* =======================
-   타입 정의
-   - API 응답용 (RawUser)
-   - 화면에서 쓸 확장 타입 (LeaderboardUser)
-========================= */
+   메트릭 설정
+======================= */
 
-// Swagger 응답 그대로
-type RawUser = {
+type MetricKey = "total" | "bug" | "maintainability" | "style" | "security";
+
+const METRIC_CONFIG: Record<
+  MetricKey,
+  {
+    key: MetricKey;
+    label: string;
+    shortLabel: string;
+    description: string;
+  }
+> = {
+  total: {
+    key: "total",
+    label: "총점",
+    shortLabel: "총점",
+    description: "전체 코드 품질 평균 점수",
+  },
+  bug: {
+    key: "bug",
+    label: "Bug",
+    shortLabel: "Bug",
+    description: "버그 탐지 및 안정성 점수",
+  },
+  maintainability: {
+    key: "maintainability",
+    label: "Maintainability",
+    shortLabel: "Maint.",
+    description: "유지보수 용이성 점수",
+  },
+  style: {
+    key: "style",
+    label: "Style",
+    shortLabel: "Style",
+    description: "코드 스타일/일관성 점수",
+  },
+  security: {
+    key: "security",
+    label: "Security",
+    shortLabel: "Sec.",
+    description: "보안 관련 점수",
+  },
+};
+
+/* =======================
+   타입 & 유틸
+======================= */
+
+type UserWithStats = {
   id: number;
-  github_id: string;
+  github_id: string | null;
   login: string;
-  name: string | null;
   avatar_url: string | null;
+  // 집계 데이터
+  review_count: number;
+  avg_total: number | null;
+  avg_bug: number | null;
+  avg_maintainability: number | null;
+  avg_style: number | null;
+  avg_security: number | null;
 };
 
-// 화면용 타입 (더미 점수/향상률/리뷰수 포함)
-type LeaderboardUser = RawUser & {
-  global_score: number; // 전체 점수 (0~100 정도)
-  improvement_rate: number; // 향상률 (%)
-  review_count: number; // 리뷰 요청 수
+type RankedUser = UserWithStats & {
+  rank: number;
+  compositeScore: number; // 선택한 메트릭 평균
 };
 
-type RankedUser = LeaderboardUser & { rank: number };
+function getMetricValue(u: UserWithStats, metric: MetricKey): number | null {
+  switch (metric) {
+    case "total":
+      return u.avg_total;
+    case "bug":
+      return u.avg_bug;
+    case "maintainability":
+      return u.avg_maintainability;
+    case "style":
+      return u.avg_style;
+    case "security":
+      return u.avg_security;
+    default:
+      return null;
+  }
+}
 
-// ⚠️ 실제 프로젝트에서 사용 중인 API BASE 로 교체/정리해줘
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://18.205.229.159:8000";
+function calcCompositeScore(u: UserWithStats, metrics: MetricKey[]): number {
+  const values = metrics
+    .map((m) => getMetricValue(u, m))
+    .filter((v): v is number => typeof v === "number");
+
+  if (!values.length) return NaN;
+  const sum = values.reduce((a, b) => a + b, 0);
+  return Math.round((sum / values.length) * 10) / 10;
+}
+
+function formatLogin(u: UserWithStats) {
+  return u.login;
+}
+
+function buildAvatarUrl(u: UserWithStats, size = 48) {
+  if (u.avatar_url && u.avatar_url !== "string") return u.avatar_url;
+  if (u.login) {
+    return `https://github.com/${u.login}.png?size=${size}`;
+  }
+  return "";
+}
+
+/* =======================
+   컴포넌트
+======================= */
 
 export default function Leaderboard() {
   const { user, isAuthenticated } = useAuth();
 
-  const [data, setData] = useState<LeaderboardUser[]>([]);
+  const [stats, setStats] = useState<UserStatsApiItem[]>([]);
+  const [users, setUsers] = useState<RawUser[]>([]);
+
+  const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
+    "total",
+  ]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* ----------------- 데이터 로딩 ----------------- */
+  // 리스트에서 내 row를 찾기 위한 ref
+  const myRowRef = useRef<HTMLDivElement | null>(null);
+
+  /* ------------ 데이터 로딩 ------------ */
 
   useEffect(() => {
     let cancelled = false;
 
-    async function fetchLeaderboard() {
+    async function load() {
       try {
         setIsLoading(true);
         setError(null);
 
-        // ✅ 실제 엔드포인트: /v1/users
-        const res = await fetch(`${API_BASE}/v1/users`, {
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-
-        const json = (await res.json()) as RawUser[];
+        const [statsRes, usersRes] = await Promise.all([
+          fetchUserStats(),
+          fetchUsers(),
+        ]);
 
         if (cancelled) return;
 
-        // ⚠️ 서버에 아직 점수/향상률이 없어서
-        //    id 기반으로 "항상 동일한 더미 값"을 만들어서 UI용 데이터 구성
-        const enriched: LeaderboardUser[] = json.map((u, idx) => {
-          const base = u.id ?? idx + 1;
-
-          // 60~99 사이 점수
-          const global_score = 60 + ((base * 7) % 40);
-
-          // -3.0 ~ +13.0% 사이 (대부분 +)
-          const improvement_rate = (((base * 13) % 160) - 30) / 10;
-
-          // 5 ~ 44개 리뷰 수
-          const review_count = 5 + ((base * 5) % 40);
-
-          return {
-            ...u,
-            global_score,
-            improvement_rate,
-            review_count,
-          };
-        });
-
-        setData(enriched);
-      } catch (err: any) {
+        setStats(statsRes);
+        setUsers(usersRes);
+      } catch (e: any) {
         if (!cancelled) {
-          console.error("Failed to load leaderboard:", err);
-          setError(err?.message ?? "랭킹 정보를 불러오지 못했어요.");
+          console.error("Failed to load leaderboard:", e);
+          setError(
+            e?.message ?? "랭킹 데이터를 불러오는 중 오류가 발생했습니다."
+          );
         }
       } finally {
         if (!cancelled) {
@@ -116,483 +175,383 @@ export default function Leaderboard() {
       }
     }
 
-    fetchLeaderboard();
+    load();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  /* ----------------- 정렬 / 랭크 계산 ----------------- */
+  /* ------------ stats + users join ------------ */
 
-  const rankedByScore: RankedUser[] = useMemo(() => {
-    if (!data.length) return [];
-    return [...data]
-      .sort((a, b) => b.global_score - a.global_score)
-      .map((u, idx) => ({ ...u, rank: idx + 1 }));
-  }, [data]);
+  const joinedUsers: UserWithStats[] = useMemo(() => {
+    if (!stats.length || !users.length) return [];
 
-  const rankedByImprovement: RankedUser[] = useMemo(() => {
-    if (!data.length) return [];
-    return [...data]
-      .sort((a, b) => b.improvement_rate - a.improvement_rate)
-      .map((u, idx) => ({ ...u, rank: idx + 1 }));
-  }, [data]);
+    // github_id 기준으로 조인
+    const byGithubId = new Map<string | null, RawUser>();
+    for (const u of users) {
+      byGithubId.set(u.github_id, u);
+    }
 
-  /* ----------------- 내 순위 / 주변 ----------------- */
+    return stats
+      .map<UserWithStats | null>((s) => {
+        const u = byGithubId.get(s.github_id ?? null);
+        if (!u) return null; // 혹시 없는 경우 스킵
 
-  const myRankByScore = useMemo(() => {
-    if (!user || !rankedByScore.length) return null;
+        return {
+          id: u.id,
+          github_id: u.github_id,
+          login: u.login,
+          avatar_url: u.avatar_url,
+          review_count: s.review_count,
+          avg_total: s.avg_total,
+          avg_bug: s.avg_bug,
+          avg_maintainability: s.avg_maintainability,
+          avg_style: s.avg_style,
+          avg_security: s.avg_security,
+        };
+      })
+      .filter((u): u is UserWithStats => u !== null)
+      .sort((a, b) => a.id - b.id); // 기본 정렬은 id
+  }, [stats, users]);
+
+  /* ------------ 선택한 메트릭 기반 랭킹 계산 ------------ */
+
+  const rankedUsers: RankedUser[] = useMemo(() => {
+    if (!joinedUsers.length) return [];
+
+    const metrics = selectedMetrics.length ? selectedMetrics : ["total"];
+
+    const withScore: RankedUser[] = joinedUsers.map((u) => {
+      const compositeScore = calcCompositeScore(u, metrics);
+      return {
+        ...u,
+        compositeScore,
+        rank: 0, // 이후에 채움
+      };
+    });
+
+    withScore.sort((a, b) => {
+      const av = isNaN(a.compositeScore) ? -Infinity : a.compositeScore;
+      const bv = isNaN(b.compositeScore) ? -Infinity : b.compositeScore;
+      return bv - av;
+    });
+
+    return withScore.map((u, idx) => ({ ...u, rank: idx + 1 }));
+  }, [joinedUsers, selectedMetrics]);
+
+  /* ------------ 내 순위 ------------ */
+
+  const myRank = useMemo(() => {
+    if (!isAuthenticated || !user || !rankedUsers.length) return null;
+
     return (
-      rankedByScore.find(
-        (u) => u.github_id === user.github_id || u.login === user.login
+      rankedUsers.find(
+        (u) =>
+          (u.github_id && u.github_id === user.github_id) ||
+          (u.login && u.login === user.login)
       ) ?? null
     );
-  }, [rankedByScore, user]);
+  }, [rankedUsers, user, isAuthenticated]);
 
-  const myAroundByScore = useMemo(() => {
-    if (!myRankByScore || !rankedByScore.length) return [];
-    const idx = rankedByScore.findIndex((u) => u.id === myRankByScore.id);
-    const start = Math.max(0, idx - 2);
-    return rankedByScore.slice(start, start + 5);
-  }, [myRankByScore, rankedByScore]);
+  /* ------------ 핸들러 ------------ */
 
-  /* ----------------- UI 헬퍼 ----------------- */
-
-  const badgeForRank = (rank: number) => {
-    if (rank === 1) {
-      return (
-        <Badge className="gap-1 bg-gradient-to-r from-yellow-400 to-amber-500 text-black">
-          <Trophy className="h-3 w-3" />
-          1위
-        </Badge>
-      );
-    }
-    if (rank === 2 || rank === 3) {
-      return (
-        <Badge className="gap-1 bg-violet-600/90 text-white">
-          <Medal className="h-3 w-3" />
-          TOP 3
-        </Badge>
-      );
-    }
-    if (rank <= 10) {
-      return (
-        <Badge
-          variant="outline"
-          className="border-violet-500/60 text-violet-300"
-        >
-          TOP 10
-        </Badge>
-      );
-    }
-    return null;
+  const toggleMetric = (key: MetricKey) => {
+    setSelectedMetrics((prev) => {
+      const exists = prev.includes(key);
+      if (exists) {
+        if (prev.length === 1) return prev; // 최소 1개 유지
+        return prev.filter((m) => m !== key);
+      }
+      return [...prev, key];
+    });
   };
 
-  const renderGithubAvatar = (u: RawUser | LeaderboardUser, size = 32) => {
-    const src =
-      u.avatar_url || `https://github.com/${u.login}.png?size=${size}`;
-
-    return (
-      <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-slate-700 bg-slate-900">
-        <img
-          src={src}
-          alt={u.login}
-          className="h-full w-full object-cover"
-          loading="lazy"
-        />
-      </div>
-    );
+  const handleScrollToMe = () => {
+    if (myRowRef.current) {
+      myRowRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
   };
 
-  const formatName = (u: RawUser | LeaderboardUser) =>
-    u.name?.trim() ? u.name : u.login;
+  const hasData = !!rankedUsers.length && !isLoading && !error;
 
-  /* ----------------- 렌더링 ----------------- */
+  /* ------------ 렌더링 ------------ */
 
   return (
     <div className="space-y-6">
       {/* 상단 헤더 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-yellow-400" />
-            Leaderboard
-          </h1>
           <p className="mt-1 text-xs text-slate-400">
-            글로벌 코드 품질 점수와 향상률 기준으로 유저 랭킹을 확인할 수
-            있어요.
-            <span className="ml-1 opacity-60">(현재는 더미 점수 기반 UI)</span>
+            원하는 유형을 선택해서 유저들의 평균 점수 랭킹을 살펴보세요.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2 text-[11px] text-slate-400">
-          <Github className="h-3.5 w-3.5" />
-          <span>GitHub OAuth 기반 유저 랭킹</span>
         </div>
       </div>
 
       {/* 내 순위 카드 */}
-      <Card className="border-violet-500/40 bg-gradient-to-br from-violet-600/20 via-slate-950 to-violet-900/40 shadow-sm shadow-violet-500/40">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/20">
-              <User2 className="h-5 w-5 text-violet-200" />
-            </div>
-            <div className="space-y-0.5">
-              <CardTitle className="text-sm">내 순위</CardTitle>
-              <p className="text-[11px] text-slate-300">
-                GitHub 계정으로 로그인하면 내 랭킹이 여기 표시됩니다.
-              </p>
-            </div>
-          </div>
+      <Card className="border-violet-500/40 bg-slate-950/90 shadow-sm shadow-violet-500/30">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {isAuthenticated && myRank ? (
+            <>
+              {(() => {
+                const rankEmoji =
+                  myRank.rank === 1
+                    ? "👑"
+                    : myRank.rank === 2
+                    ? "🥈"
+                    : myRank.rank === 3
+                    ? "🥉"
+                    : null;
 
-          {isAuthenticated ? (
-            myRankByScore ? (
-              <div className="flex flex-wrap items-center gap-3 text-xs">
-                {badgeForRank(myRankByScore.rank)}
+                return (
+                  <>
+                    {/* 아바타 + 이름 + 나의 순위 */}
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border bg-slate-900",
+                          myRank.rank === 1
+                            ? "border-amber-300/80 shadow-[0_0_18px_rgba(251,191,36,0.65)]"
+                            : myRank.rank === 2 || myRank.rank === 3
+                            ? "border-violet-400/80"
+                            : "border-violet-400/60"
+                        )}
+                      >
+                        {buildAvatarUrl(myRank) ? (
+                          <img
+                            src={buildAvatarUrl(myRank, 96)}
+                            alt={myRank.login}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Github className="h-6 w-6 text-slate-200" />
+                        )}
+                      </div>
 
-                <div className="flex items-center gap-2 rounded-full bg-slate-900/60 px-3 py-1 border border-slate-700/80">
-                  {renderGithubAvatar(myRankByScore)}
-                  <div className="flex flex-col">
-                    <span className="truncate text-[12px] font-semibold text-slate-50">
-                      {formatName(myRankByScore)}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      @{myRankByScore.login}
-                    </span>
-                  </div>
-                </div>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-medium text-slate-300">
+                          {formatLogin(myRank)}
+                        </span>
 
-                <div className="flex items-baseline gap-1 rounded-full bg-slate-900/60 px-3 py-1 border border-violet-500/40">
-                  <span className="text-[11px] text-slate-300">Global</span>
-                  <span className="text-lg font-bold tracking-tight tabular-nums text-violet-100">
-                    {myRankByScore.global_score.toFixed(1)}
-                  </span>
-                  <span className="text-[11px] text-slate-400">점</span>
-                </div>
+                        {/* 나의 순위: [보라색 큰 숫자] [이모지] */}
+                        <div className="mt-1 flex flex-wrap items-baseline gap-2">
+                          <span className="text-lg sm:text-xl font-semibold text-slate-50">
+                            나의 순위:
+                          </span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-violet-300">
+                              {myRank.rank}위
+                            </span>
+                            {rankEmoji && (
+                              <span className="text-2xl sm:text-3xl leading-none">
+                                {rankEmoji}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-1 rounded-full bg-emerald-900/40 px-3 py-1 border border-emerald-500/40">
-                  <TrendingUp className="h-3 w-3 text-emerald-300" />
-                  <span className="text-[11px] text-emerald-200">
-                    {myRankByScore.improvement_rate >= 0 ? "+" : ""}
-                    {myRankByScore.improvement_rate.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-full border border-dashed border-slate-600 px-3 py-1 text-[11px] text-slate-300">
-                아직 랭킹에 집계되지 않았어요. 리뷰를 조금 더 요청해 보세요.
-              </div>
-            )
+                    {/* 점수 + 내 위치로 버튼 */}
+                    <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                      <div className="inline-flex items-baseline gap-1 rounded-full border border-violet-500/50 bg-slate-950/90 px-3 py-1.5">
+                        <span className="text-[11px] text-slate-300">
+                          평균 점수
+                        </span>
+                        <span className="text-lg font-bold tracking-tight tabular-nums text-violet-100">
+                          {isNaN(myRank.compositeScore)
+                            ? "-"
+                            : myRank.compositeScore.toFixed(1)}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          / 100
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full border-violet-500/70 bg-slate-950/80 text-xs text-violet-100 hover:bg-violet-900/60"
+                        onClick={handleScrollToMe}
+                      >
+                        내 위치로
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
+            </>
           ) : (
-            <div className="rounded-full border border-dashed border-slate-600 px-3 py-1 text-[11px] text-slate-300">
-              로그인하면 내 순위를 확인할 수 있어요.
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-slate-600 bg-slate-900/80">
+                  <Github className="h-5 w-5 text-slate-300" />
+                </div>
+                <div className="flex flex-col">
+                  <CardTitle className="text-base text-slate-50">
+                    내 순위
+                  </CardTitle>
+                  <p className="text-[11px] text-slate-400">
+                    GitHub로 로그인하고 리뷰를 남기면 나의 순위를 확인할 수
+                    있어요.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </CardHeader>
 
-        {/* 내 주변 랭킹 */}
-        {isAuthenticated && myAroundByScore.length > 0 && (
-          <CardContent className="border-t border-slate-800/80 pt-3">
-            <p className="mb-2 text-[11px] text-slate-400">내 주변 유저들</p>
+        {/* 메트릭 선택 버튼들 */}
+        <CardContent className="border-t border-slate-800/80 pt-3">
+          <div className="flex flex-wrap gap-2">
+            {(
+              Object.values(METRIC_CONFIG) as Array<
+                (typeof METRIC_CONFIG)[MetricKey]
+              >
+            ).map(({ key, label }) => {
+              const active = selectedMetrics.includes(key);
+              return (
+                <Button
+                  key={key}
+                  size="sm"
+                  variant={active ? "default" : "outline"}
+                  onClick={() => toggleMetric(key)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border text-xs transition-all duration-150 cursor-pointer",
+                    active
+                      ? "border-violet-500 bg-gradient-to-r from-violet-600 via-violet-500 to-violet-400 text-white shadow-sm shadow-violet-500/40 hover:shadow-md hover:shadow-violet-500/50 hover:brightness-110"
+                      : "border-slate-700 bg-slate-900/80 text-slate-300 hover:border-violet-400 hover:bg-violet-500/10 hover:text-violet-100"
+                  )}
+                >
+                  <span>{label}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 랭킹 리스트 */}
+      <Card className="border-violet-500/40 bg-slate-950/90 shadow-sm shadow-violet-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-sm">
+            <span className="text-slate-50">유저 랭킹</span>
+            {hasData && (
+              <span className="text-[11px] text-slate-400">
+                총 {rankedUsers.length}명
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-md" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-between rounded-md border border-red-500/50 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+              <span>{error}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-500/60 text-red-200 hover:bg-red-900/40"
+                onClick={() => window.location.reload()}
+              >
+                새로고침
+              </Button>
+            </div>
+          ) : !rankedUsers.length ? (
+            <div className="rounded-md border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">
+              아직 랭킹 데이터가 없습니다.
+            </div>
+          ) : (
             <div className="space-y-1.5 text-xs">
-              {myAroundByScore.map((u) => {
-                const isMe = myRankByScore && u.id === myRankByScore.id;
+              {rankedUsers.map((u) => {
+                const isMe =
+                  isAuthenticated &&
+                  ((user?.github_id && u.github_id === user.github_id) ||
+                    (user?.login && u.login === user.login));
+
+                const rowScore = isNaN(u.compositeScore)
+                  ? "-"
+                  : u.compositeScore.toFixed(1);
+
+                const rankBadge =
+                  u.rank === 1
+                    ? "👑"
+                    : u.rank === 2
+                    ? "🥈"
+                    : u.rank === 3
+                    ? "🥉"
+                    : null;
+
                 return (
                   <div
                     key={u.id}
+                    ref={isMe ? myRowRef : undefined}
                     className={cn(
-                      "flex items-center gap-3 rounded-md border px-2 py-1.5",
+                      "flex items-center gap-3 rounded-md border px-2 py-1.5 transition-colors",
                       isMe
-                        ? "border-violet-500/70 bg-violet-950/70"
-                        : "border-slate-800/80 bg-slate-950/60"
+                        ? "border-violet-500/80 bg-violet-950/80"
+                        : "border-slate-800 bg-slate-950 hover:border-violet-500/40 hover:bg-slate-900"
                     )}
                   >
-                    <div className="flex w-10 items-center justify-center text-[11px] font-semibold text-slate-300">
-                      {u.rank}위
+                    {/* 순위 */}
+                    <div className="flex w-12 flex-col items-center justify-center">
+                      <span
+                        className={cn(
+                          "text-[11px] font-semibold",
+                          u.rank <= 3 ? "text-yellow-300" : "text-slate-300"
+                        )}
+                      >
+                        {u.rank}위
+                      </span>
+                      {rankBadge && (
+                        <span className="text-[13px] leading-none">
+                          {rankBadge}
+                        </span>
+                      )}
                     </div>
-                    {renderGithubAvatar(u, 28)}
+
+                    {/* 아바타 */}
+                    <div className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-700 bg-slate-900">
+                      {buildAvatarUrl(u) ? (
+                        <img
+                          src={buildAvatarUrl(u, 64)}
+                          alt={u.login}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <Github className="h-4 w-4 text-slate-400" />
+                      )}
+                    </div>
+
+                    {/* 이름 */}
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[12px] text-slate-100">
-                        {formatName(u)}
+                      <span className="truncate text-[12px] text-slate-50">
+                        {formatLogin(u)}
                       </span>
-                      <span className="text-[10px] text-slate-500">
-                        @{u.login}
-                      </span>
+                      {/* 리뷰 개수 텍스트 제거 */}
                     </div>
+
+                    {/* 점수 */}
                     <div className="flex items-baseline gap-1">
-                      <span className="text-[11px] text-slate-400">점수</span>
+                      <span className="text-[11px] text-slate-400">Score</span>
                       <span className="text-sm font-semibold tabular-nums text-slate-50">
-                        {u.global_score.toFixed(1)}
+                        {rowScore}
                       </span>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </CardContent>
-        )}
+          )}
+        </CardContent>
       </Card>
-
-      {/* 메인 랭킹 탭 */}
-      <Tabs defaultValue="score" className="space-y-4">
-        <TabsList className="w-full justify-start gap-1 bg-slate-900/80">
-          <TabsTrigger
-            value="score"
-            className="flex items-center gap-1 text-xs"
-          >
-            <Medal className="h-3 w-3" />
-            Global Score
-          </TabsTrigger>
-          <TabsTrigger
-            value="improvement"
-            className="flex items-center gap-1 text-xs"
-          >
-            <TrendingUp className="h-3 w-3" />
-            향상률
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Global Score 탭 */}
-        <TabsContent value="score">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Medal className="h-4 w-4 text-yellow-400" />
-                Global Score 랭킹
-              </CardTitle>
-              <span className="text-[11px] text-slate-400">
-                상위 50명까지 표시됩니다.
-              </span>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              {isLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full rounded-md" />
-                  ))}
-                </div>
-              ) : error ? (
-                <div className="flex items-center justify-between rounded-md border border-red-500/50 bg-red-950/40 px-3 py-2 text-xs text-red-200">
-                  <span>랭킹 데이터를 불러오는 중 오류가 발생했어요.</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-500/60 text-red-200 hover:bg-red-900/40"
-                    onClick={() => window.location.reload()}
-                  >
-                    새로고침
-                  </Button>
-                </div>
-              ) : !rankedByScore.length ? (
-                <div className="rounded-md border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">
-                  아직 랭킹 데이터가 없습니다.
-                </div>
-              ) : (
-                <div className="space-y-1.5 text-xs">
-                  {rankedByScore.slice(0, 50).map((u) => {
-                    const isMe =
-                      isAuthenticated &&
-                      (u.github_id === user?.github_id ||
-                        u.login === user?.login);
-                    const badge = badgeForRank(u.rank);
-
-                    return (
-                      <div
-                        key={u.id}
-                        className={cn(
-                          "flex items-center gap-3 rounded-md border px-2 py-1.5 transition-colors",
-                          isMe
-                            ? "border-violet-500/70 bg-violet-950/80"
-                            : "border-slate-800 bg-slate-950 hover:border-violet-500/40 hover:bg-slate-900"
-                        )}
-                      >
-                        {/* 순위 */}
-                        <div className="flex w-10 flex-col items-center justify-center">
-                          <span
-                            className={cn(
-                              "text-[11px] font-semibold",
-                              u.rank <= 3 ? "text-yellow-300" : "text-slate-300"
-                            )}
-                          >
-                            {u.rank}위
-                          </span>
-                          {badge && (
-                            <div className="mt-0.5 text-[9px]">{badge}</div>
-                          )}
-                        </div>
-
-                        {/* 아바타 */}
-                        {renderGithubAvatar(u, 32)}
-
-                        {/* 이름 / 아이디 */}
-                        <div className="flex min-w-0 flex-1 flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-[12px] text-slate-50">
-                              {formatName(u)}
-                            </span>
-                            <a
-                              href={`https://github.com/${u.login}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900/80 text-slate-300 hover:text-white"
-                              title="GitHub 프로필 열기"
-                            >
-                              <Github className="h-3 w-3" />
-                            </a>
-                          </div>
-                          <span className="text-[10px] text-slate-500">
-                            @{u.login} · 리뷰 {u.review_count}개
-                          </span>
-                        </div>
-
-                        {/* 점수 */}
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-[11px] text-slate-400">
-                            점수
-                          </span>
-                          <span className="text-sm font-semibold tabular-nums text-slate-50">
-                            {u.global_score.toFixed(1)}
-                          </span>
-                        </div>
-
-                        {/* 향상률 미니 */}
-                        <div className="ml-2 flex items-center gap-1 rounded-full bg-emerald-950/60 px-2 py-0.5 text-[10px] text-emerald-300 border border-emerald-500/40">
-                          <TrendingUp className="h-3 w-3" />
-                          <span>
-                            {u.improvement_rate >= 0 ? "+" : ""}
-                            {u.improvement_rate.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 향상률 탭 */}
-        <TabsContent value="improvement">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-300" />
-                향상률 랭킹
-              </CardTitle>
-              <span className="text-[11px] text-slate-400">
-                최근 기준 Global Score 향상률 상위 50명입니다.
-              </span>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-              {isLoading ? (
-                <div className="space-y-2">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <Skeleton key={i} className="h-10 w-full rounded-md" />
-                  ))}
-                </div>
-              ) : error ? (
-                <div className="flex items-center justify-between rounded-md border border-red-500/50 bg-red-950/40 px-3 py-2 text-xs text-red-200">
-                  <span>랭킹 데이터를 불러오는 중 오류가 발생했어요.</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-500/60 text-red-200 hover:bg-red-900/40"
-                    onClick={() => window.location.reload()}
-                  >
-                    새로고침
-                  </Button>
-                </div>
-              ) : !rankedByImprovement.length ? (
-                <div className="rounded-md border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">
-                  아직 향상률 데이터가 없습니다.
-                </div>
-              ) : (
-                <div className="space-y-1.5 text-xs">
-                  {rankedByImprovement.slice(0, 50).map((u) => {
-                    const isMe =
-                      isAuthenticated &&
-                      (u.github_id === user?.github_id ||
-                        u.login === user?.login);
-
-                    return (
-                      <div
-                        key={u.id}
-                        className={cn(
-                          "flex items-center gap-3 rounded-md border px-2 py-1.5 transition-colors",
-                          isMe
-                            ? "border-emerald-500/70 bg-emerald-950/80"
-                            : "border-slate-800 bg-slate-950 hover:border-emerald-500/40 hover:bg-slate-900"
-                        )}
-                      >
-                        {/* 순위 */}
-                        <div className="flex w-10 flex-col items-center justify-center">
-                          <span
-                            className={cn(
-                              "text-[11px] font-semibold",
-                              u.rank <= 3
-                                ? "text-emerald-300"
-                                : "text-slate-300"
-                            )}
-                          >
-                            {u.rank}위
-                          </span>
-                        </div>
-
-                        {/* 아바타 */}
-                        {renderGithubAvatar(u, 32)}
-
-                        {/* 이름 / 아이디 */}
-                        <div className="flex min-w-0 flex-1 flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-[12px] text-slate-50">
-                              {formatName(u)}
-                            </span>
-                            <a
-                              href={`https://github.com/${u.login}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900/80 text-slate-300 hover:text-white"
-                              title="GitHub 프로필 열기"
-                            >
-                              <Github className="h-3 w-3" />
-                            </a>
-                          </div>
-                          <span className="text-[10px] text-slate-500">
-                            @{u.login} · 리뷰 {u.review_count}개
-                          </span>
-                        </div>
-
-                        {/* 향상률 */}
-                        <div className="flex items-center gap-1 rounded-full bg-emerald-900/70 px-2 py-0.5 text-[11px] text-emerald-100 border border-emerald-500/60">
-                          <TrendingUp className="h-3 w-3" />
-                          <span>
-                            {u.improvement_rate >= 0 ? "+" : ""}
-                            {u.improvement_rate.toFixed(1)}%
-                          </span>
-                        </div>
-
-                        {/* 현재 점수 미니 */}
-                        <div className="ml-2 flex items-baseline gap-1">
-                          <span className="text-[11px] text-slate-400">
-                            점수
-                          </span>
-                          <span className="text-sm font-semibold tabular-nums text-slate-50">
-                            {u.global_score.toFixed(1)}
-                          </span>
-                        </div>
-
-                        <ArrowUpRight className="ml-1 h-3 w-3 text-slate-500" />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

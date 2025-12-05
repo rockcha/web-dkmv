@@ -1,9 +1,7 @@
-// src/pages/Compare.tsx
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-
-import { useAuth } from "@/features/auth/AuthContext";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import type React from "react";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,8 +16,6 @@ import {
   Wrench,
   Palette,
   ShieldCheck,
-  Bot,
-  Filter,
   Calendar,
   ArrowUpDown,
 } from "lucide-react";
@@ -42,7 +38,6 @@ import {
 ========================= */
 
 type CategoryKey = "bug" | "maintainability" | "style" | "security";
-
 type MetricKey = "total" | CategoryKey;
 
 const METRIC_CONFIG: Record<
@@ -59,35 +54,40 @@ const METRIC_CONFIG: Record<
     key: "total",
     label: "총점",
     shortLabel: "총점",
-    description: "전체 코드 품질 점수 기준으로 모델을 비교합니다.",
+    description:
+      "각 모델의 전체 코드 품질 총점 평균으로 비교하거나, 다른 지표와 함께 평균을 냅니다.",
     icon: Gauge,
   },
   bug: {
     key: "bug",
-    label: "Bug 점수",
+    label: "Bug",
     shortLabel: "Bug",
-    description: "버그 탐지 및 안전성 관련 점수 기준 비교입니다.",
+    description:
+      "버그 탐지 및 안전성 관련 점수 평균으로 비교하거나, 다른 지표와 함께 평균을 냅니다.",
     icon: AlertTriangle,
   },
   maintainability: {
     key: "maintainability",
     label: "Maintainability",
     shortLabel: "Maint.",
-    description: "코드 유지보수 용이성 기준 비교입니다.",
+    description:
+      "유지보수 용이성 점수 평균으로 비교하거나, 다른 지표와 함께 평균을 냅니다.",
     icon: Wrench,
   },
   style: {
     key: "style",
     label: "Style",
     shortLabel: "Style",
-    description: "코드 스타일/일관성 기준 비교입니다.",
+    description:
+      "코드 스타일/일관성 점수 평균으로 비교하거나, 다른 지표와 함께 평균을 냅니다.",
     icon: Palette,
   },
   security: {
     key: "security",
     label: "Security",
     shortLabel: "Sec.",
-    description: "보안 관련 지적 능력 기준 비교입니다.",
+    description:
+      "보안 관련 지적 능력 점수 평균으로 비교하거나, 다른 지표와 함께 평균을 냅니다.",
     icon: ShieldCheck,
   },
 };
@@ -127,10 +127,6 @@ function getModelMeta(id: string): ModelOption & { providerClass: string } {
 }
 
 /* =======================
-   유틸
-========================= */
-
-/* =======================
    공통: 모델 정보 뱃지
 ========================= */
 
@@ -138,9 +134,7 @@ type ModelMeta = ReturnType<typeof getModelMeta>;
 
 function ModelInfoRow({
   meta,
-  count,
   compact = false,
-  showCountInline = true,
 }: {
   meta: ModelMeta;
   count?: number;
@@ -151,7 +145,7 @@ function ModelInfoRow({
     meta.label || meta.id.replace(`${meta.provider}/`, "") || meta.id;
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
+    <div className="flex flex-col min-w-0 items-center gap-2">
       {/* Provider 칩 */}
       <Badge
         variant="outline"
@@ -174,13 +168,6 @@ function ModelInfoRow({
       >
         {displayName}
       </span>
-
-      {/* 표본 수 */}
-      {showCountInline && typeof count === "number" && (
-        <span className="flex-shrink-0 text-[11px] text-slate-400">
-          표본 {count}개
-        </span>
-      )}
     </div>
   );
 }
@@ -199,13 +186,13 @@ const TIME_RANGE_LABELS: Record<TimeRangeKey, string> = {
 };
 
 const SORT_LABELS: Record<SortKey, string> = {
-  popular: "인기 순 (리뷰 수)",
+  popular: "인기 순",
   score: "점수 순",
-  alpha: "가나다 순",
+  alpha: "이름 순",
 };
 
 /* =======================
-   Compare Page
+   Compare Page 타입
 ========================= */
 
 type ModelStats = {
@@ -216,9 +203,55 @@ type ModelStats = {
   avgByCategory: Record<CategoryKey, number>;
 };
 
-export default function Compare() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+// 카드 하나의 최소 너비 기준 (Tailwind min-w-[230px] 참고)
+const CARD_MIN_WIDTH = 230;
 
+/* =======================
+   상세 메트릭 타일
+========================= */
+
+function DetailMetricTile({
+  title,
+  icon: Icon,
+  value,
+  suffix,
+  accentClass,
+}: {
+  title: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  value: string;
+  suffix?: string;
+  accentClass?: string;
+}) {
+  return (
+    <div className="flex flex-col rounded-2xl border border-slate-700/70 bg-slate-950/70 px-3 py-3 shadow-sm shadow-slate-900/60">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium text-slate-400">{title}</span>
+        <span
+          className={cn(
+            "inline-flex items-center justify-center rounded-full bg-slate-800/80 px-1.5 py-0.5 text-[10px] text-slate-200",
+            accentClass
+          )}
+        >
+          <Icon className="mr-1 h-3 w-3" />
+          <span className="tracking-tight">Score</span>
+        </span>
+      </div>
+      <div className="flex items-baseline gap-1">
+        <span className="text-xl font-semibold tabular-nums text-slate-50">
+          {value}
+        </span>
+        {suffix && <span className="text-[11px] text-slate-500">{suffix}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* =======================
+   Compare Page
+========================= */
+
+export default function Compare() {
   // 🔹 API 원본 데이터
   const [rawStats, setRawStats] = useState<ModelStatsApiItem[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -227,20 +260,62 @@ export default function Compare() {
   // 🔹 필터/정렬 상태
   const [timeRange, setTimeRange] = useState<TimeRangeKey>("week"); // 기본: 이번주
   const [sortKey, setSortKey] = useState<SortKey>("popular"); // 기본: 인기 순
+
+  // 🔹 선택 지표 (총점 + 카테고리 전부 동일하게 토글)
   const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
     "total",
-  ]); // 기본: 총점만
+  ]);
 
-  const primaryMetric: MetricKey = selectedMetrics[0] ?? "total";
+  // 🔹 가로 리스트 페이지네이션 & 선택된 모델
+  const [page, setPage] = useState(0);
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
 
-  const primaryMetricConfig = METRIC_CONFIG[primaryMetric];
-  const PrimaryMetricIcon = primaryMetricConfig.icon;
+  // 🔹 부모 width 에 따라 동적으로 pageSize 계산
+  const [pageSize, setPageSize] = useState(5);
+  const listContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const isScoreSort = sortKey === "score";
+
+  useEffect(() => {
+    const el = listContainerRef.current;
+    if (!el || typeof window === "undefined") return;
+
+    const updatePageSize = () => {
+      const width = el.clientWidth || el.offsetWidth || 0;
+      if (!width) return;
+      // 카드 최소 너비 + gap 대략 16px 고려해서 계산
+      const perPage = Math.max(1, Math.floor(width / (CARD_MIN_WIDTH + 16)));
+      setPageSize(perPage);
+    };
+
+    updatePageSize();
+
+    let resizeObserver: ResizeObserver | null = null;
+
+    if ("ResizeObserver" in window) {
+      resizeObserver = new ResizeObserver(updatePageSize);
+      resizeObserver.observe(el);
+    } else {
+      window.addEventListener("resize", updatePageSize);
+    }
+
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      } else {
+        window.removeEventListener("resize", updatePageSize);
+      }
+    };
+  }, []);
 
   const handleToggleMetric = (key: MetricKey) => {
+    // 🔒 점수 순이 아닐 때는 지표 뱃지 조작 불가
+    if (!isScoreSort) return;
+
     setSelectedMetrics((prev) => {
       const exists = prev.includes(key);
       if (exists) {
-        // 최소 1개는 항상 유지
+        // 최소 1개는 유지
         if (prev.length === 1) return prev;
         return prev.filter((m) => m !== key);
       }
@@ -248,9 +323,15 @@ export default function Compare() {
     });
   };
 
-  const loadStats = useCallback(async () => {
-    if (!isAuthenticated) return;
+  const primaryMetricKey: MetricKey = selectedMetrics[0] ?? "total";
+  const PrimaryMetricIcon = METRIC_CONFIG[primaryMetricKey].icon;
+  const hasMultiMetrics = selectedMetrics.length > 1;
 
+  const metricBadgeLabel = hasMultiMetrics
+    ? "선택 지표 평균"
+    : `${METRIC_CONFIG[primaryMetricKey].label} 기준`;
+
+  const loadStats = useCallback(async () => {
     setStatsLoading(true);
     setStatsError(null);
 
@@ -275,7 +356,7 @@ export default function Compare() {
     } finally {
       setStatsLoading(false);
     }
-  }, [isAuthenticated, timeRange]);
+  }, [timeRange]);
 
   useEffect(() => {
     loadStats();
@@ -303,6 +384,30 @@ export default function Compare() {
     });
   }, [rawStats]);
 
+  /* ------------ 유틸: 선택 지표 평균 점수 ------------ */
+
+  const getAverageMetric = (row: ModelStats): number => {
+    const metrics = selectedMetrics.length
+      ? selectedMetrics
+      : (["total"] as MetricKey[]);
+
+    let sum = 0;
+    let used = 0;
+
+    for (const key of metrics) {
+      const v =
+        key === "total" ? row.avgTotal : row.avgByCategory[key as CategoryKey];
+      if (!isNaN(v)) {
+        sum += v;
+        used += 1;
+      }
+    }
+
+    if (used === 0) return -Infinity;
+    // 🔢 선택한 지표 개수로 나누어 평균 (예: 총점+Bug+Style 선택 시 3개로 나눔)
+    return sum / used;
+  };
+
   /* ------------ 정렬 적용 ------------ */
 
   const sortedStats = useMemo(() => {
@@ -320,52 +425,61 @@ export default function Compare() {
         )
       );
     } else {
-      // 점수 순: primaryMetric 기준 내림차순
-      list.sort((a, b) => {
-        const getVal = (row: ModelStats): number => {
-          const base =
-            primaryMetric === "total"
-              ? row.avgTotal
-              : row.avgByCategory[primaryMetric];
-          return isNaN(base) ? -Infinity : base;
-        };
-        return getVal(b) - getVal(a);
-      });
+      // 점수 순: 선택 지표 평균 기준 내림차순
+      list.sort((a, b) => getAverageMetric(b) - getAverageMetric(a));
     }
 
     return list;
-  }, [modelStats, sortKey, primaryMetric]);
-
-  /* ------------ 로그인 안 된 경우 ------------ */
-
-  if (!isAuthenticated && !authLoading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <Card className="max-w-md border-dashed">
-          <CardHeader className="flex flex-col items-center gap-2 text-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/10">
-              <Bot className="h-5 w-5 text-violet-500" />
-            </div>
-            <CardTitle className="text-lg">
-              모델 비교를 보려면 로그인이 필요해요
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-center text-sm text-muted-foreground">
-            <p>
-              GitHub로 로그인하면 모델별 리뷰 집계 데이터를
-              <br />
-              기간/정렬 조건에 맞게 비교해볼 수 있어요.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  }, [modelStats, sortKey, selectedMetrics]);
 
   const hasData = !!sortedStats.length && !statsLoading;
+  const topModel = hasData ? sortedStats[0] : null;
+
+  const safePageSize = Math.max(1, pageSize);
+  const pageCount = Math.max(1, Math.ceil(sortedStats.length / safePageSize));
+
+  // 필터/정렬/지표 바뀌면 페이지 초기화
+  useEffect(() => {
+    setPage(0);
+  }, [timeRange, sortKey, selectedMetrics.join(","), rawStats]);
+
+  // 페이지 범위 보정
+  useEffect(() => {
+    const maxPage = Math.max(
+      0,
+      Math.ceil(sortedStats.length / safePageSize) - 1
+    );
+    if (page > maxPage) {
+      setPage(0);
+    }
+  }, [sortedStats, page, safePageSize]);
+
+  const startIndex = page * safePageSize;
+  const pagedStats = sortedStats.slice(startIndex, startIndex + safePageSize);
+
+  // 선택된 모델 기본값 & 유효성 유지
+  useEffect(() => {
+    if (!sortedStats.length) {
+      setSelectedModelId(null);
+      return;
+    }
+    const exists = selectedModelId
+      ? sortedStats.some((m) => m.modelId === selectedModelId)
+      : false;
+    if (!selectedModelId || !exists) {
+      setSelectedModelId(sortedStats[0].modelId);
+    }
+  }, [sortedStats, selectedModelId]);
+
+  // 상세 보기용 모델
+  const detailModel = useMemo(() => {
+    if (!hasData) return null;
+    if (!selectedModelId) return topModel;
+    return sortedStats.find((m) => m.modelId === selectedModelId) ?? topModel;
+  }, [hasData, selectedModelId, sortedStats, topModel]);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-full overflow-x-hidden">
       {/* 에러 표시 */}
       {statsError && (
         <Card className="border-red-300 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40">
@@ -390,18 +504,13 @@ export default function Compare() {
         </Card>
       )}
 
-      {/* 상단 필터/정렬/메트릭 선택 */}
+      {/* 상단 필터/정렬/지표 선택 */}
       <Card>
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-3 w-full">
             {/* 기간 & 정렬 */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1 text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  <Filter className="h-3 w-3" />
-                  Filters
-                </span>
-
+              <div className="flex flex-wrap items-center gap-4 font-bold text-muted-foreground">
                 {/* 기간 선택 */}
                 <div className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5 text-slate-400" />
@@ -409,7 +518,7 @@ export default function Compare() {
                     value={timeRange}
                     onValueChange={(value: TimeRangeKey) => setTimeRange(value)}
                   >
-                    <SelectTrigger className="h-8 w-[120px] rounded-full border-slate-300 bg-background/80 text-xs dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
+                    <SelectTrigger className="h-8 w-[120px] rounded-full border-slate-300 bg-background/80 text-sm dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent side="bottom" align="start">
@@ -433,95 +542,99 @@ export default function Compare() {
                     value={sortKey}
                     onValueChange={(value: SortKey) => setSortKey(value)}
                   >
-                    <SelectTrigger className="h-8 w-[160px] rounded-full border-slate-300 bg-background/80 text-xs dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
+                    <SelectTrigger className="h-8 w-[160px] rounded-full border-slate-300 bg-background/80 text-sm dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent side="bottom" align="start">
                       <SelectItem value="popular" className="cursor-pointer">
-                        인기 순 (리뷰 수)
+                        인기 순
                       </SelectItem>
                       <SelectItem value="score" className="cursor-pointer">
                         점수 순
                       </SelectItem>
                       <SelectItem value="alpha" className="cursor-pointer">
-                        가나다 순
+                        이름 순
                       </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-
-              {hasData && (
-                <div className="text-right text-[11px] text-slate-500 dark:text-slate-400">
-                  총{" "}
-                  <span className="font-semibold text-slate-800 dark:text-slate-100">
-                    {sortedStats.length}
-                  </span>{" "}
-                  개 모델
-                </div>
-              )}
             </div>
 
-            {/* 메트릭 멀티 선택 */}
-            <div className="flex flex-wrap gap-2">
-              {(
-                Object.values(METRIC_CONFIG) as Array<
-                  (typeof METRIC_CONFIG)[MetricKey]
+            {/* 지표 멀티 선택 (총점 + 유형 동일 취급) */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    "total",
+                    "bug",
+                    "maintainability",
+                    "style",
+                    "security",
+                  ] as MetricKey[]
+                ).map((key) => {
+                  const cfg = METRIC_CONFIG[key];
+                  const active = selectedMetrics.includes(key);
+                  const Icon = cfg.icon;
+                  return (
+                    <Button
+                      key={key}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      disabled={!isScoreSort}
+                      onClick={() => handleToggleMetric(key)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full border text-xs transition-all duration-150 px-3 py-1",
+                        active
+                          ? "border-violet-500 bg-violet-600/90 text-white shadow-sm shadow-violet-500/40 hover:bg-violet-500"
+                          : "bg-background/70 text-slate-500 dark:text-slate-300 hover:border-violet-300 hover:bg-violet-50/60 hover:text-violet-600 dark:hover:border-violet-500/70 dark:hover:bg-violet-500/10 dark:hover:text-violet-200",
+                        !isScoreSort &&
+                          "opacity-50 cursor-not-allowed hover:border-slate-700 hover:bg-background/70 hover:text-slate-400 dark:hover:bg-slate-900"
+                      )}
+                    >
+                      <Icon className="h-3 w-3" />
+                      <span>{cfg.label}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+              {/* 안내 문구: 점수 순에서만 지표 선택 가능 */}
+              <p className="text-[11px] text-slate-500">
+                <span
+                  className={cn(
+                    "font-medium",
+                    isScoreSort ? "text-violet-300" : "text-slate-400"
+                  )}
                 >
-              ).map(({ key, label, icon: Icon }) => {
-                const active = selectedMetrics.includes(key);
-                return (
-                  <Button
-                    key={key}
-                    size="sm"
-                    variant={active ? "default" : "outline"}
-                    onClick={() => handleToggleMetric(key)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full border text-xs transition-all duration-150 cursor-pointer",
-                      active
-                        ? "border-violet-500 bg-gradient-to-r from-violet-600 via-violet-500 to-violet-400 text-white shadow-sm shadow-violet-500/40 hover:shadow-md hover:shadow-violet-500/50 hover:brightness-110"
-                        : "bg-background/70 text-slate-500 dark:text-slate-300 hover:border-violet-300 hover:bg-violet-50/60 hover:text-violet-600 dark:hover:border-violet-500/70 dark:hover:bg-violet-500/10 dark:hover:text-violet-200"
-                    )}
-                  >
-                    <Icon className="h-3 w-3" />
-                    <span>{label}</span>
-                    {primaryMetric === key && (
-                      <span className="ml-0.5 rounded-full bg-white/20 px-1.5 text-[9px] uppercase tracking-wide">
-                        기준
-                      </span>
-                    )}
-                  </Button>
-                );
-              })}
+                  점수 순
+                </span>{" "}
+                정렬에서만 여러 지표(총점, Bug, 스타일 등)를 선택해서 평균
+                점수로 비교할 수 있어요.
+              </p>
             </div>
           </div>
         </CardHeader>
       </Card>
 
-      {/* 모델별 랭킹 카드 리스트 (가로 슬라이드) */}
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <CardTitle className="flex flex-col gap-2 text-sm sm:text-base sm:flex-row sm:items-center sm:justify-between">
-            <span className="flex items-center gap-1">
+      {/* 모델별 랭킹 카드 리스트 (가로 슬라이드 + 페이지네이션) */}
+      <Card className="overflow-hidden dark:border-white/50">
+        <CardHeader className="space-y-3">
+          {/* 제목 */}
+          <CardTitle className="flex flex-col gap-1 text-sm sm:text-base sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex items-center gap-2">
               모델 랭킹
               <span className="text-xs text-slate-400">
-                ({TIME_RANGE_LABELS[timeRange]} · {SORT_LABELS[sortKey]})
+                {TIME_RANGE_LABELS[timeRange]}
               </span>
             </span>
-
-            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <PrimaryMetricIcon className="h-3.5 w-3.5 text-violet-400" />
-              <span>
-                {primaryMetricConfig.label} 기준 정렬 ·{" "}
-                {primaryMetricConfig.description}
-              </span>
-            </div>
           </CardTitle>
         </CardHeader>
+
         <CardContent className="pb-4">
           {statsLoading ? (
-            <div className="-mx-4 md:mx-0">
-              <div className="flex gap-3 overflow-x-auto px-4 pb-2">
+            <div className="w-full max-w-full">
+              <div className="flex gap-3 overflow-x-auto pb-2">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <Skeleton
                     key={i}
@@ -537,81 +650,70 @@ export default function Compare() {
               다른 기간이나 정렬 조건으로 다시 시도해보세요.
             </div>
           ) : (
-            <div className="-mx-4 md:mx-0">
+            <div className="w-full max-w-full" ref={listContainerRef}>
+              {/* 이 섹션 안에서만 가로 스크롤 (뷰포트 전체 X) */}
               <div
                 className="
-                  flex gap-3 overflow-x-auto px-4 pb-3 pt-1
+                  flex gap-3 overflow-x-auto pb-3 pt-1
                   scrollbar-thin scrollbar-thumb-slate-600/60 scrollbar-track-transparent
                 "
               >
-                {sortedStats.map((row, index) => {
-                  const rank = index + 1;
-                  const isTop1 = rank === 1;
-                  const isTop2 = rank === 2;
-                  const isTop3 = rank === 3;
+                {pagedStats.map((row) => {
+                  const globalRank =
+                    sortedStats.findIndex((m) => m.modelId === row.modelId) + 1;
 
-                  const getMetricValue = (metric: MetricKey): number => {
-                    return metric === "total"
-                      ? row.avgTotal
-                      : row.avgByCategory[metric];
-                  };
+                  // 메인 표시 값 계산
+                  let primaryValueText = "";
+                  let primarySuffix = "";
 
-                  const primaryValue = getMetricValue(primaryMetric);
-                  const primaryHasData = !isNaN(primaryValue);
+                  if (sortKey === "popular") {
+                    // 인기 순 => 리뷰 수만
+                    primaryValueText = row.count.toLocaleString();
+                    primarySuffix = "개";
+                  } else {
+                    const avg = getAverageMetric(row);
+                    primaryValueText = !isNaN(avg) ? avg.toFixed(1) : "-";
+                    primarySuffix = "/ 100";
+                  }
 
                   const rankBadge =
-                    rank === 1
-                      ? "👑"
-                      : rank === 2
+                    globalRank === 1
+                      ? "🥇"
+                      : globalRank === 2
                       ? "🥈"
-                      : rank === 3
+                      : globalRank === 3
                       ? "🥉"
                       : null;
 
+                  const isSelected = selectedModelId === row.modelId;
+
                   return (
-                    <div
+                    <button
                       key={row.modelId}
+                      type="button"
+                      onClick={() => setSelectedModelId(row.modelId)}
                       className={cn(
-                        "relative flex h-full min-h-[150px] min-w-[230px] max-w-[260px] flex-col justify-between rounded-2xl border p-3 sm:p-4 text-xs transition-all duration-200 overflow-hidden",
-                        isTop1 &&
-                          "border-violet-400/80 bg-gradient-to-br from-violet-500/25 via-slate-900 to-violet-900/60 shadow-lg shadow-violet-500/50",
-                        !isTop1 &&
-                          isTop2 &&
-                          "border-slate-500/80 bg-slate-900/90 shadow-md shadow-slate-600/40",
-                        !isTop1 &&
-                          !isTop2 &&
-                          isTop3 &&
-                          "border-amber-500/80 bg-slate-900/80 shadow-md shadow-amber-500/40",
-                        !isTop1 &&
-                          !isTop2 &&
-                          !isTop3 &&
-                          "border-slate-700/60 bg-slate-900/70 hover:border-violet-400/80 hover:bg-slate-900"
+                        "dark:border-white/30 relative flex h-full min-h-[150px] min-w-[230px] max-w-[260px] flex-col justify-between rounded-2xl border border-slate-700/70 bg-slate-950/70 p-3 sm:p-4 text-xs transition-all duration-200 overflow-hidden text-left cursor-pointer",
+                        "shadow-sm shadow-slate-950/60 hover:-translate-y-0.5 hover:border-violet-400/80 hover:shadow-lg hover:shadow-violet-500/40",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-0",
+                        isSelected &&
+                          "ring-2 ring-violet-400/90 ring-offset-0 border-violet-400 bg-slate-950"
                       )}
                     >
-                      {isTop1 && (
-                        <div className="pointer-events-none absolute -top-16 -right-10 h-32 w-32 rounded-full bg-violet-500/25 blur-3xl" />
-                      )}
-
                       {/* 1줄: 순위 + 아이콘 */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1">
-                          <span
-                            className={cn(
-                              "text-[11px] font-semibold",
-                              isTop1
-                                ? "text-violet-100"
-                                : isTop2
-                                ? "text-slate-100"
-                                : isTop3
-                                ? "text-amber-100"
-                                : "text-slate-300"
-                            )}
-                          >
-                            {rank}위
+                          <span className="text-[11px] font-semibold text-slate-100">
+                            {globalRank}위
                           </span>
+                          {isSelected && (
+                            <span className="ml-1 rounded-full bg-violet-500/25 px-1.5 py-0.5 text-[10px] text-violet-100">
+                              선택됨
+                            </span>
+                          )}
                         </div>
                         {rankBadge && (
-                          <span className="text-lg drop-shadow">
+                          <span className="text-lg drop-shadow-sm">
                             {rankBadge}
                           </span>
                         )}
@@ -622,144 +724,187 @@ export default function Compare() {
                         <ModelInfoRow
                           meta={row.meta}
                           compact
-                          showCountInline={false}
+                          // 점수 순 / 이름 순일 때 표본 안 보이게
+                          showCountInline={sortKey === "popular"}
+                          count={row.count}
                         />
                       </div>
 
-                      {/* 3줄: 주요 점수 + 표본 수 */}
+                      {/* 3줄: 메인 지표 */}
                       <div className="mt-3 flex items-end justify-between">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-baseline gap-1">
-                            <span
-                              className={cn(
-                                "font-bold tracking-tight tabular-nums",
-                                isTop1
-                                  ? "text-2xl text-violet-50"
-                                  : isTop2
-                                  ? "text-xl text-slate-50"
-                                  : isTop3
-                                  ? "text-xl text-amber-100"
-                                  : "text-xl text-slate-100"
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold tracking-tight tabular-nums text-xl text-violet-500">
+                              {sortKey === "popular" ? (
+                                <>리뷰 {primaryValueText}</>
+                              ) : (
+                                primaryValueText
                               )}
-                            >
-                              {primaryHasData ? primaryValue.toFixed(1) : "-"}
                             </span>
-                            <span className="text-[11px] text-slate-400">
-                              / 100
-                            </span>
+                            {primarySuffix && (
+                              <span className="text-[11px] text-slate-400">
+                                {primarySuffix}
+                              </span>
+                            )}
                           </div>
-                          <span className="text-[11px] text-slate-400">
-                            {primaryMetricConfig.label}
-                          </span>
                         </div>
-                        <span className="text-[11px] text-slate-300">
-                          표본 {row.count}개
-                        </span>
                       </div>
 
-                      {/* 4줄: 선택된 다른 메트릭들 미니 뱃지 */}
-                      {selectedMetrics.length > 1 && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {selectedMetrics.map((metric) => {
-                            if (metric === primaryMetric) return null;
-                            const cfg = METRIC_CONFIG[metric];
-                            const val = getMetricValue(metric);
-                            const has = !isNaN(val);
-                            const MetricIcon = cfg.icon;
-                            return (
-                              <div
-                                key={metric}
-                                className="inline-flex items-center gap-1 rounded-full border border-slate-600/80 bg-slate-900/80 px-2 py-0.5 text-[10px] text-slate-200"
-                              >
-                                <MetricIcon className="h-3 w-3 text-slate-300" />
-                                <span className="font-medium">
-                                  {cfg.shortLabel}
-                                </span>
-                                <span className="tabular-nums">
-                                  {has ? val.toFixed(1) : "-"}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                      {/* ✅ 유형 고를 때마다 카드 안에 미니 뱃지 추가되는 부분은 삭제함 */}
+                    </button>
                   );
                 })}
               </div>
+
+              {/* 페이지네이션 */}
+              {pageCount > 1 && (
+                <div className="mt-3 flex items-center justify-center">
+                  <div className="inline-flex items-center gap-1 rounded-full border border-slate-700/80 bg-slate-950/80 px-1.5 py-1 shadow-sm shadow-slate-950/60 backdrop-blur">
+                    {Array.from({ length: pageCount }, (_, i) => {
+                      const isActive = i === page;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setPage(i)}
+                          className={cn(
+                            "relative cursor-pointer rounded-full px-3 py-0.5 text-[11px] transition-[background,transform,box-shadow,color,border] duration-150",
+                            isActive
+                              ? "border border-violet-400/80 bg-violet-600 text-white shadow-sm shadow-violet-500/70"
+                              : "border border-transparent text-slate-300 hover:border-violet-400/80 hover:bg-violet-500/10 hover:text-violet-100 hover:-translate-y-0.5"
+                          )}
+                        >
+                          {i + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* 상세 테이블: 현재 정렬 순서대로 전체 출력 */}
-      {hasData && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">
-              모델별 카테고리 평균 점수
-              <span className="ml-1 text-xs font-normal text-slate-400">
-                ({TIME_RANGE_LABELS[timeRange]} · {SORT_LABELS[sortKey]})
+      {/* 상세 보기 섹션: 선택된 모델 상세 (기본: 1위) */}
+      {hasData && detailModel && (
+        <Card className="mt-4 dark:border-white/50">
+          <CardHeader className="space-y-2">
+            <CardTitle className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <span className="flex items-center gap-2">
+                상세 보기
+                <span className="text-xs text-slate-400">
+                  선택한 모델 카드 상세 정보
+                </span>
+              </span>
+              <span className="text-[11px] text-slate-500">
+                {TIME_RANGE_LABELS[timeRange]} · {SORT_LABELS[sortKey]}
               </span>
             </CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[11px] font-semibold text-violet-100">
+                  {(() => {
+                    const rank =
+                      sortedStats.findIndex(
+                        (m) => m.modelId === detailModel.modelId
+                      ) + 1;
+                    return `${rank}위`;
+                  })()}
+                </span>
+                <ModelInfoRow
+                  meta={detailModel.meta}
+                  count={detailModel.count}
+                  showCountInline
+                />
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <PrimaryMetricIcon className="h-3.5 w-3.5 text-violet-400" />
+                <span>{metricBadgeLabel}</span>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <div className="min-w-[720px]">
-              <div className="grid grid-cols-[minmax(52px,0.5fr)_2.4fr_repeat(5,minmax(80px,1fr))] gap-2 pb-2 text-xs font-semibold text-slate-200">
-                <div className="text-center">순위</div>
-                <div>모델</div>
-                <div className="text-center">총점</div>
-                <div className="text-center">Bug</div>
-                <div className="text-center">Maintainability</div>
-                <div className="text-center">Style</div>
-                <div className="text-center">Security</div>
+          <CardContent className="space-y-4 text-xs text-slate-200">
+            {/* 선택 기준 요약 라인 */}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-700/70 bg-slate-950/70 px-2.5 py-1">
+                <PrimaryMetricIcon className="h-3.5 w-3.5 text-violet-300" />
+                <span className="font-medium text-slate-200">
+                  {metricBadgeLabel}
+                </span>
+                <span className="mx-1 h-3 w-px bg-slate-700/70" />
+                <span className="text-slate-400">
+                  {TIME_RANGE_LABELS[timeRange]} · {SORT_LABELS[sortKey]}
+                </span>
               </div>
 
-              {sortedStats.map((row, index) => {
-                const rank = index + 1;
-                return (
-                  <div
-                    key={row.modelId}
-                    className="grid grid-cols-[minmax(52px,0.5fr)_2.4fr_repeat(5,minmax(80px,1fr))] gap-2 border-t border-slate-800 py-2 text-xs"
-                  >
-                    {/* 순위 */}
-                    <div className="flex items-center justify-center text-[11px] font-semibold text-slate-200">
-                      {rank}위
-                    </div>
+              <span className="text-[10px] text-slate-500">
+                상단 카드에서 모델을 선택하면 이 영역이 함께 변경됩니다.
+              </span>
+            </div>
 
-                    {/* 모델 정보 + 표본 수 */}
-                    <ModelInfoRow
-                      meta={row.meta}
-                      count={row.count}
-                      showCountInline
-                    />
+            {/* 메트릭 타일 그리드 */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {/* 총점 */}
+              <DetailMetricTile
+                title="총점"
+                icon={Gauge}
+                value={
+                  !isNaN(detailModel.avgTotal)
+                    ? detailModel.avgTotal.toFixed(1)
+                    : "-"
+                }
+                suffix="/ 100"
+                accentClass="bg-violet-600/20 text-violet-100"
+              />
 
-                    <div className="text-center">
-                      {!isNaN(row.avgTotal) ? row.avgTotal.toFixed(1) : "-"}
-                    </div>
-                    <div className="text-center">
-                      {!isNaN(row.avgByCategory.bug)
-                        ? row.avgByCategory.bug.toFixed(1)
-                        : "-"}
-                    </div>
-                    <div className="text-center">
-                      {!isNaN(row.avgByCategory.maintainability)
-                        ? row.avgByCategory.maintainability.toFixed(1)
-                        : "-"}
-                    </div>
-                    <div className="text-center">
-                      {!isNaN(row.avgByCategory.style)
-                        ? row.avgByCategory.style.toFixed(1)
-                        : "-"}
-                    </div>
-                    <div className="text-center">
-                      {!isNaN(row.avgByCategory.security)
-                        ? row.avgByCategory.security.toFixed(1)
-                        : "-"}
-                    </div>
-                  </div>
-                );
-              })}
+              {/* Bug */}
+              <DetailMetricTile
+                title="Bug"
+                icon={AlertTriangle}
+                value={
+                  !isNaN(detailModel.avgByCategory.bug)
+                    ? detailModel.avgByCategory.bug.toFixed(1)
+                    : "-"
+                }
+                accentClass="bg-amber-500/15 text-amber-100"
+              />
+
+              {/* Maintainability */}
+              <DetailMetricTile
+                title="Maintainability"
+                icon={Wrench}
+                value={
+                  !isNaN(detailModel.avgByCategory.maintainability)
+                    ? detailModel.avgByCategory.maintainability.toFixed(1)
+                    : "-"
+                }
+                accentClass="bg-sky-500/15 text-sky-100"
+              />
+
+              {/* Style */}
+              <DetailMetricTile
+                title="Style"
+                icon={Palette}
+                value={
+                  !isNaN(detailModel.avgByCategory.style)
+                    ? detailModel.avgByCategory.style.toFixed(1)
+                    : "-"
+                }
+                accentClass=" dark:border-white/30 bg-pink-500/15 text-pink-100"
+              />
+
+              {/* Security */}
+              <DetailMetricTile
+                title="Security"
+                icon={ShieldCheck}
+                value={
+                  !isNaN(detailModel.avgByCategory.security)
+                    ? detailModel.avgByCategory.security.toFixed(1)
+                    : "-"
+                }
+                accentClass="bg-emerald-500/15 text-emerald-100"
+              />
             </div>
           </CardContent>
         </Card>

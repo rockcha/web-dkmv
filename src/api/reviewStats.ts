@@ -1,5 +1,7 @@
 // src/api/reviewStats.ts
 
+import { api } from "./client";
+
 // ─────────────────────────────
 // 타입 정의
 // ─────────────────────────────
@@ -27,9 +29,6 @@ export type ModelStatsQuery = {
 // 날짜 유틸 & 프리셋
 // ─────────────────────────────
 
-/**
- * 날짜를 YYYY-MM-DD 형태로 포맷
- */
 function toDateStr(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -37,14 +36,10 @@ function toDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/**
- * 기간 프리셋
- * - 이번주 / 이번달 / 이번년도
- */
 export const datePreset = {
   thisWeek(): { from: string; to: string } {
     const now = new Date();
-    const day = now.getDay() || 7; // 일요일(0)을 7로
+    const day = now.getDay() || 7;
     const monday = new Date(now);
     monday.setDate(now.getDate() - (day - 1));
     const sunday = new Date(monday);
@@ -66,51 +61,21 @@ export const datePreset = {
 };
 
 // ─────────────────────────────
-// API Base 설정
-// ─────────────────────────────
-
-/**
- * API base 결정 로직
- *
- * - 로컬(dev): 기본값 "/api" 사용 → Vite proxy를 통해
- *   http://18.205.229.159:8000/v1/... 으로 전달됨.
- * - 배포(prod): VITE_API_BASE_URL 이 있으면 그 값을 사용.
- *   (ex. "https://web-dkmv.vercel.app/api" 또는 "https://api.dkmv.app")
- */
-const RAW_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
-
-// 기본은 "/api" 로 두고, env가 있으면 그걸 사용
-const API_BASE = (RAW_BASE && RAW_BASE.replace(/\/+$/, "")) || "/api";
-
-// ─────────────────────────────
-// API 함수
+// 실제 API 함수
 // ─────────────────────────────
 
 export async function fetchModelStats(
   params: ModelStatsQuery = {}
 ): Promise<ModelStatsApiItem[]> {
-  const search = new URLSearchParams();
+  const json = await api.get<ModelStatsApiResponse>(
+    "/v1/reviews/stats/by-model",
+    {
+      query: {
+        from: params.from ?? undefined,
+        to: params.to ?? undefined,
+      },
+    }
+  );
 
-  if (params.from) search.set("from", params.from);
-  if (params.to) search.set("to", params.to);
-
-  const qs = search.toString();
-  const url = API_BASE + "/v1/reviews/stats/by-model" + (qs ? `?${qs}` : "");
-
-  // 디버깅용 로그
-  console.log("[fetchModelStats] url:", url);
-
-  const res = await fetch(url, {
-    credentials: "include", // 쿠키 기반 인증이면 유지, 아니면 빼도 됨
-    headers: {
-      accept: "application/json",
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`모델 통계 불러오기 실패: ${res.status}`);
-  }
-
-  const json = (await res.json()) as ModelStatsApiResponse;
   return json.data ?? [];
 }

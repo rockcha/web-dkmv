@@ -111,7 +111,7 @@ function CustomTooltip({ active, payload }: any) {
   const item = payload[0].payload;
 
   return (
-    <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg">
+    <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg ">
       <div className="mb-1 text-[11px] text-slate-300">날짜: {item.date}</div>
       <div className="space-y-0.5">
         {payload.map((p: any) => (
@@ -224,7 +224,7 @@ export default function Dashboard() {
   const activeMetricConfig = METRIC_CONFIG[activeMetric];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 mt-6">
       {/* 에러 표시 */}
       {error && (
         <Card className="border-red-300 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40">
@@ -252,9 +252,9 @@ export default function Dashboard() {
       {/* 상단 카드 영역 */}
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-3">
         {/* 평균 점수 */}
-        <Card className="relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-violet-500/5 via-transparent to-violet-500/10" />
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <Card className="relative overflow-hidden dark:border-white/50">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-violet-500/5 via-transparent to-violet-500/10 " />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 ">
             <CardTitle className="text-sm font-medium">평균 점수</CardTitle>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500/10">
               <Gauge className="h-4 w-4 text-violet-500" />
@@ -277,7 +277,7 @@ export default function Dashboard() {
         </Card>
 
         {/* 총 리뷰 수 */}
-        <Card className="relative overflow-hidden">
+        <Card className="relative overflow-hidden dark:border-white/50">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-slate-500/5 via-transparent to-slate-500/10" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">총 리뷰 수</CardTitle>
@@ -302,7 +302,7 @@ export default function Dashboard() {
         </Card>
 
         {/* 향상률 */}
-        <Card className="relative overflow-hidden">
+        <Card className="relative overflow-hidden dark:border-white/50">
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-emerald-500/5 via-transparent to-emerald-500/10" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">향상률</CardTitle>
@@ -337,7 +337,7 @@ export default function Dashboard() {
       </div>
 
       {/* 점수 추이 그래프 (토글로 하나씩 보기) */}
-      <Card>
+      <Card className="dark:border-white/50">
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
             <CardTitle>점수 추이 (총점 & 유형별)</CardTitle>

@@ -23,7 +23,6 @@ import {
   Gauge,
   FileText,
   BarChart3,
-  Info,
   Loader2,
   ChevronsUpDown,
   Search,
@@ -338,6 +337,11 @@ export default function Playground() {
 
   const [responseInfo, setResponseInfo] = useState<string>("");
 
+  // /v1/fix 응답 (원문 그대로)
+  const [fixLoading, setFixLoading] = useState(false);
+  const [fixResponseRaw, setFixResponseRaw] = useState<string | null>(null);
+  const [fixError, setFixError] = useState<string | null>(null);
+
   const abortRef = useRef<AbortController | null>(null);
 
   const onPick = (val: string) => {
@@ -350,6 +354,8 @@ export default function Playground() {
   const run = async () => {
     setError(null);
     setResponseInfo("");
+    setFixResponseRaw(null);
+    setFixError(null);
     setLastReviewId(null);
     setReviewDetail(null);
     setPhase("requesting");
@@ -564,27 +570,48 @@ export default function Playground() {
   );
   const currentModelMeta = currentModel ? formatModelName(currentModel) : null;
 
-  return (
-    <div className="space-y-6">
-      {/* ✅ 최상단: 사용법 + 모델 선택 안내 */}
-      <div className="flex items-start gap-3 rounded-lg border border-dashed border-slate-700 bg-slate-950/60 px-3 py-2 text-[11px] text-muted-foreground">
-        <Info className="mt-0.5 h-4 w-4 text-sky-400" />
-        <div className="space-y-1">
-          <p className="font-medium text-sky-100">사용 방법</p>
-          <ul className="list-disc space-y-0.5 pl-4">
-            <li>왼쪽에서 샘플 코드를 선택하거나 직접 코드를 붙여넣습니다.</li>
-            <li>
-              오른쪽에서 <b>모델을 검색하여 선택</b>한 뒤, &quot;리뷰 생성
-              요청&quot; 버튼을 누릅니다.
-            </li>
-            <li>
-              아래 카드에서 전체 점수 · 요약 · 카테고리별 코멘트를 확인할 수
-              있습니다.
-            </li>
-          </ul>
-        </div>
-      </div>
+  // 리뷰가 나온 뒤에만 fix 가능
+  const canFix = !!body && lastReviewId != null && !loading && !fixLoading;
 
+  const runFix = async () => {
+    if (!body || lastReviewId == null) return;
+
+    setFixError(null);
+    setFixResponseRaw(null);
+    setFixLoading(true);
+
+    try {
+      const fixUrl = "/api/v1/fix";
+      const resp = await fetch(fixUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          review_id: lastReviewId,
+          code,
+        }),
+      });
+
+      const text = await resp.text();
+
+      if (!resp.ok) {
+        throw new Error(
+          `코드 수정 제안 요청 실패 (HTTP ${resp.status})\n${text}`
+        );
+      }
+
+      // 원본 그대로 보여주기 위해 그대로 저장
+      setFixResponseRaw(text);
+    } catch (e: any) {
+      setFixError(e?.message ?? String(e));
+    } finally {
+      setFixLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 mt-6">
       {/* 상단: Playground 컨트롤 */}
       <Card>
         <CardContent className="space-y-4">
@@ -655,7 +682,7 @@ export default function Playground() {
                   <span className="uppercase text-[9px] text-slate-400">
                     {currentModelMeta.provider}
                   </span>
-                  <span className="truncate max-w-[140px]">
+                  <span className="max-w-[140px] truncate">
                     {currentModelMeta.name}
                   </span>
                 </span>
@@ -698,22 +725,39 @@ export default function Playground() {
             리뷰 결과
           </CardTitle>
 
-          {isLoadingPhase && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-300">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              리뷰 분석 중...
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {body && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-[11px]"
+                disabled={!canFix}
+                onClick={runFix}
+              >
+                {fixLoading && (
+                  <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                )}
+                코드 수정 제안
+              </Button>
+            )}
+
+            {isLoadingPhase && (
+              <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-300">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                리뷰 분석 중...
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {!reviewDetail || !body ? (
             isLoadingPhase ? (
               <div className="rounded-md border border-slate-800 bg-slate-950/60 p-4">
                 <div className="space-y-3 text-[11px]">
-                  <div className="h-3 w-32 rounded bg-slate-800 animate-pulse" />
-                  <div className="h-8 rounded bg-slate-800/80 animate-pulse" />
-                  <div className="h-8 rounded bg-slate-800/70 animate-pulse" />
-                  <div className="h-8 rounded bg-slate-800/60 animate-pulse" />
+                  <div className="h-3 w-32 animate-pulse rounded bg-slate-800" />
+                  <div className="h-8 animate-pulse rounded bg-slate-800/80" />
+                  <div className="h-8 animate-pulse rounded bg-slate-800/70" />
+                  <div className="h-8 animate-pulse rounded bg-slate-800/60" />
                 </div>
               </div>
             ) : (
@@ -838,6 +882,27 @@ export default function Playground() {
                   </div>
                 </div>
               </div>
+
+              {/* /v1/fix 응답 뷰어 */}
+              {fixError && (
+                <div className="text-xs text-red-400">
+                  코드 수정 제안 에러: {fixError}
+                </div>
+              )}
+
+              {fixResponseRaw && (
+                <div className="rounded-xl border bg-slate-950/60 p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-emerald-400" />
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      코드 수정 제안 응답 (/v1/fix 원본)
+                    </span>
+                  </div>
+                  <ScrollArea className="mt-1 max-h-64 rounded-md border border-slate-800 bg-slate-950/80 p-3 text-xs font-mono leading-relaxed">
+                    <pre className="whitespace-pre-wrap">{fixResponseRaw}</pre>
+                  </ScrollArea>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

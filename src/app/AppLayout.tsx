@@ -123,7 +123,7 @@ export default function AppLayout() {
                   ${
                     isSidebarCollapsed
                       ? "w-[72px]"
-                      : "w-[260px] md:w-[280px] xl:w-[300px]"
+                      : "w-[160px] md:w-[180px] xl:w-[200px]"
                   }
                 `}
               >
@@ -287,7 +287,7 @@ function PageHeader({ pathname }: { pathname: string }) {
   const CurrentIcon = current?.icon ?? LayoutDashboard;
 
   return (
-    <header className="mb-6 flex items-center gap-3" aria-label="페이지 제목">
+    <header className=" flex items-center gap-3" aria-label="페이지 제목">
       <CurrentIcon className="size-6 text-violet-600 dark:text-violet-400" />
       <h1 className="text-2xl md:text-[26px] font-semibold">
         {current?.label ?? "페이지"}

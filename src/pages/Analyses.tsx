@@ -255,8 +255,8 @@ export default function Analyses() {
 
       {/* 2. 상단 요약 카드 */}
       {stats && (
-        <Card className="border-violet-500/20 bg-gradient-to-r from-violet-500/5 via-background to-background">
-          <CardContent className="grid gap-4 p-5 md:grid-cols-4">
+        <Card className="border-violet-500/20 bg-gradient-to-r from-violet-500/5 via-background to-background dark:border-white/50 p-1">
+          <CardContent className="grid gap-4  md:grid-cols-4">
             {/* 총 리뷰 수 */}
             <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-3">
               <div className="flex items-center gap-2">
@@ -477,7 +477,7 @@ export default function Analyses() {
                     key={item.review_id}
                     className={cn(
                       "group border border-slate-200 bg-white shadow-sm",
-                      "dark:border-slate-800 dark:bg-slate-900/40"
+                      "dark:border-white/50 dark:bg-slate-900/40"
                     )}
                   >
                     <CardHeader className="border-b border-slate-100 pb-3 dark:border-slate-800">
