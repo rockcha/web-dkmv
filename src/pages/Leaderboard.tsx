@@ -219,7 +219,9 @@ export default function Leaderboard() {
   const rankedUsers: RankedUser[] = useMemo(() => {
     if (!joinedUsers.length) return [];
 
-    const metrics = selectedMetrics.length ? selectedMetrics : ["total"];
+    const metrics: MetricKey[] = selectedMetrics.length
+      ? selectedMetrics
+      : (["total"] as MetricKey[]);
 
     const withScore: RankedUser[] = joinedUsers.map((u) => {
       const compositeScore = calcCompositeScore(u, metrics);

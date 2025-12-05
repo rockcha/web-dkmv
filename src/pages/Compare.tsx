@@ -283,28 +283,16 @@ export default function Compare() {
     const updatePageSize = () => {
       const width = el.clientWidth || el.offsetWidth || 0;
       if (!width) return;
-      // 카드 최소 너비 + gap 대략 16px 고려해서 계산
       const perPage = Math.max(1, Math.floor(width / (CARD_MIN_WIDTH + 16)));
       setPageSize(perPage);
     };
 
     updatePageSize();
 
-    let resizeObserver: ResizeObserver | null = null;
-
-    if ("ResizeObserver" in window) {
-      resizeObserver = new ResizeObserver(updatePageSize);
-      resizeObserver.observe(el);
-    } else {
-      window.addEventListener("resize", updatePageSize);
-    }
+    window.addEventListener("resize", updatePageSize);
 
     return () => {
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      } else {
-        window.removeEventListener("resize", updatePageSize);
-      }
+      window.removeEventListener("resize", updatePageSize);
     };
   }, []);
 
@@ -891,7 +879,7 @@ export default function Compare() {
                     ? detailModel.avgByCategory.style.toFixed(1)
                     : "-"
                 }
-                accentClass=" dark:border-white/30 bg-pink-500/15 text-pink-100"
+                accentClass=" bg-pink-500/15 text-pink-100"
               />
 
               {/* Security */}
