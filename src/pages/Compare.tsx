@@ -130,17 +130,6 @@ function getModelMeta(id: string): ModelOption & { providerClass: string } {
    유틸
 ========================= */
 
-function mean(nums: Array<number | null | undefined>): number {
-  const filtered = nums
-    .map((n) => (typeof n === "number" ? n : null))
-    .filter((n): n is number => n !== null);
-
-  if (!filtered.length) return NaN;
-
-  const s = filtered.reduce((a, b) => a + b, 0);
-  return Math.round((s / filtered.length) * 10) / 10;
-}
-
 /* =======================
    공통: 모델 정보 뱃지
 ========================= */
