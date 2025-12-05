@@ -1,9 +1,8 @@
 // src/pages/Compare.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useReviews, type CategoryKey } from "@/lib/useReviews";
 import { useAuth } from "@/features/auth/AuthContext";
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -20,6 +19,9 @@ import {
   Palette,
   ShieldCheck,
   Bot,
+  Filter,
+  Calendar,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   Select,
@@ -29,9 +31,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import {
+  fetchModelStats,
+  type ModelStatsApiItem,
+  datePreset,
+} from "@/api/reviewStats";
+
 /* =======================
    Metric & 카테고리 설정
 ========================= */
+
+type CategoryKey = "bug" | "maintainability" | "style" | "security";
 
 type MetricKey = "total" | CategoryKey;
 
@@ -40,6 +50,7 @@ const METRIC_CONFIG: Record<
   {
     key: MetricKey;
     label: string;
+    shortLabel: string;
     description: string;
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   }
@@ -47,30 +58,35 @@ const METRIC_CONFIG: Record<
   total: {
     key: "total",
     label: "총점",
+    shortLabel: "총점",
     description: "전체 코드 품질 점수 기준으로 모델을 비교합니다.",
     icon: Gauge,
   },
   bug: {
     key: "bug",
-    label: "Bug",
+    label: "Bug 점수",
+    shortLabel: "Bug",
     description: "버그 탐지 및 안전성 관련 점수 기준 비교입니다.",
     icon: AlertTriangle,
   },
   maintainability: {
     key: "maintainability",
     label: "Maintainability",
+    shortLabel: "Maint.",
     description: "코드 유지보수 용이성 기준 비교입니다.",
     icon: Wrench,
   },
   style: {
     key: "style",
     label: "Style",
+    shortLabel: "Style",
     description: "코드 스타일/일관성 기준 비교입니다.",
     icon: Palette,
   },
   security: {
     key: "security",
     label: "Security",
+    shortLabel: "Sec.",
     description: "보안 관련 지적 능력 기준 비교입니다.",
     icon: ShieldCheck,
   },
@@ -81,18 +97,13 @@ const METRIC_CONFIG: Record<
 ========================= */
 
 const PROVIDER_COLORS: Record<string, string> = {
-  openai:
-    "bg-violet-500/10 text-violet-600 border-violet-400/40 dark:text-violet-300",
-  google:
-    "bg-emerald-500/10 text-emerald-600 border-emerald-400/40 dark:text-emerald-300",
-  anthropic: "bg-sky-500/10 text-sky-600 border-sky-400/40 dark:text-sky-300",
-  "x-ai":
-    "bg-orange-500/10 text-orange-600 border-orange-400/40 dark:text-orange-300",
-  qwen: "bg-rose-500/10 text-rose-600 border-rose-400/40 dark:text-rose-300",
-  mistralai:
-    "bg-amber-500/10 text-amber-600 border-amber-400/40 dark:text-amber-300",
-  deepseek:
-    "bg-fuchsia-500/10 text-fuchsia-600 border-fuchsia-400/40 dark:text-fuchsia-300",
+  openai: "bg-violet-500/10 text-violet-200 border-violet-400/40",
+  google: "bg-emerald-500/10 text-emerald-200 border-emerald-400/40",
+  anthropic: "bg-sky-500/10 text-sky-200 border-sky-400/40",
+  "x-ai": "bg-orange-500/10 text-orange-200 border-orange-400/40",
+  qwen: "bg-rose-500/10 text-rose-200 border-rose-400/40",
+  mistralai: "bg-amber-500/10 text-amber-200 border-amber-400/40",
+  deepseek: "bg-fuchsia-500/10 text-fuchsia-200 border-fuchsia-400/40",
 };
 
 const MODEL_MAP = new Map<string, ModelOption>(
@@ -110,7 +121,7 @@ function getModelMeta(id: string): ModelOption & { providerClass: string } {
 
   const providerClass =
     PROVIDER_COLORS[base.provider] ??
-    "bg-slate-500/10 text-slate-600 border-slate-400/40 dark:text-slate-200";
+    "bg-slate-500/10 text-slate-100 border-slate-500/60";
 
   return { ...base, providerClass };
 }
@@ -119,10 +130,15 @@ function getModelMeta(id: string): ModelOption & { providerClass: string } {
    유틸
 ========================= */
 
-function mean(nums: number[]) {
-  if (!nums.length) return NaN;
-  const s = nums.reduce((a, b) => a + b, 0);
-  return Math.round((s / nums.length) * 10) / 10;
+function mean(nums: Array<number | null | undefined>): number {
+  const filtered = nums
+    .map((n) => (typeof n === "number" ? n : null))
+    .filter((n): n is number => n !== null);
+
+  if (!filtered.length) return NaN;
+
+  const s = filtered.reduce((a, b) => a + b, 0);
+  return Math.round((s / filtered.length) * 10) / 10;
 }
 
 /* =======================
@@ -161,7 +177,7 @@ function ModelInfoRow({
       {/* 모델 이름 */}
       <span
         className={cn(
-          "truncate text-xs font-semibold text-slate-900 dark:text-slate-50",
+          "truncate text-xs font-semibold text-slate-100",
           compact
             ? "max-w-[140px] sm:max-w-[200px]"
             : "max-w-[180px] sm:max-w-[260px]"
@@ -170,9 +186,9 @@ function ModelInfoRow({
         {displayName}
       </span>
 
-      {/* 표본 수 (테이블에서만 사용) */}
+      {/* 표본 수 */}
       {showCountInline && typeof count === "number" && (
-        <span className="flex-shrink-0 text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="flex-shrink-0 text-[11px] text-slate-400">
           표본 {count}개
         </span>
       )}
@@ -181,106 +197,155 @@ function ModelInfoRow({
 }
 
 /* =======================
+   Time & Sort 옵션
+========================= */
+
+type TimeRangeKey = "week" | "month" | "year";
+type SortKey = "popular" | "score" | "alpha";
+
+const TIME_RANGE_LABELS: Record<TimeRangeKey, string> = {
+  week: "이번주",
+  month: "이번달",
+  year: "이번년도",
+};
+
+const SORT_LABELS: Record<SortKey, string> = {
+  popular: "인기 순 (리뷰 수)",
+  score: "점수 순",
+  alpha: "가나다 순",
+};
+
+/* =======================
    Compare Page
 ========================= */
 
-const TOP_COUNT_OPTIONS = [3, 5, 10];
+type ModelStats = {
+  modelId: string;
+  meta: ModelMeta;
+  count: number;
+  avgTotal: number;
+  avgByCategory: Record<CategoryKey, number>;
+};
 
 export default function Compare() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { myReviews, error, isInitialLoading, reload: load } = useReviews();
 
-  // 🔹 기본은 총점 비교
-  const [activeMetric, setActiveMetric] = useState<MetricKey>("total");
+  // 🔹 API 원본 데이터
+  const [rawStats, setRawStats] = useState<ModelStatsApiItem[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
-  // 🔹 TOP 개수 선택 (기본 5개)
-  const [topCount, setTopCount] = useState<number>(5);
+  // 🔹 필터/정렬 상태
+  const [timeRange, setTimeRange] = useState<TimeRangeKey>("week"); // 기본: 이번주
+  const [sortKey, setSortKey] = useState<SortKey>("popular"); // 기본: 인기 순
+  const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
+    "total",
+  ]); // 기본: 총점만
 
-  /* ------------ 모델별 집계 ------------ */
+  const primaryMetric: MetricKey = selectedMetrics[0] ?? "total";
 
-  type ModelStats = {
-    modelId: string;
-    meta: ReturnType<typeof getModelMeta>;
-    count: number;
-    avgTotal: number;
-    avgByCategory: Record<CategoryKey, number>;
+  const primaryMetricConfig = METRIC_CONFIG[primaryMetric];
+  const PrimaryMetricIcon = primaryMetricConfig.icon;
+
+  const handleToggleMetric = (key: MetricKey) => {
+    setSelectedMetrics((prev) => {
+      const exists = prev.includes(key);
+      if (exists) {
+        // 최소 1개는 항상 유지
+        if (prev.length === 1) return prev;
+        return prev.filter((m) => m !== key);
+      }
+      return [...prev, key];
+    });
   };
 
-  const modelStats: ModelStats[] = useMemo(() => {
-    if (!myReviews.length) return [];
+  const loadStats = useCallback(async () => {
+    if (!isAuthenticated) return;
 
-    const byModel = new Map<string, typeof myReviews>();
+    setStatsLoading(true);
+    setStatsError(null);
 
-    for (const r of myReviews) {
-      const key = r.model || "unknown";
-      if (!byModel.has(key)) byModel.set(key, []);
-      byModel.get(key)!.push(r);
+    try {
+      const range =
+        timeRange === "week"
+          ? datePreset.thisWeek()
+          : timeRange === "month"
+          ? datePreset.thisMonth()
+          : datePreset.thisYear();
+
+      const data = await fetchModelStats({
+        from: range.from,
+        to: range.to,
+      });
+
+      setRawStats(data);
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : "알 수 없는 오류가 발생했습니다.";
+      setStatsError(msg);
+    } finally {
+      setStatsLoading(false);
     }
+  }, [isAuthenticated, timeRange]);
 
-    const stats: ModelStats[] = [];
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
-    for (const [modelId, rows] of byModel.entries()) {
-      const totalScores = rows.map((r) => r.quality_score ?? 0);
-      const bugScores = rows.map((r) => r.scores_by_category?.bug ?? 0);
-      const maintScores = rows.map(
-        (r) => r.scores_by_category?.maintainability ?? 0
-      );
-      const styleScores = rows.map((r) => r.scores_by_category?.style ?? 0);
-      const secScores = rows.map((r) => r.scores_by_category?.security ?? 0);
+  /* ------------ API 결과 → 화면용 모델 ------------ */
 
-      stats.push({
+  const modelStats: ModelStats[] = useMemo(() => {
+    if (!rawStats.length) return [];
+
+    return rawStats.map((row) => {
+      const modelId = row.model ?? "unknown";
+      return {
         modelId,
         meta: getModelMeta(modelId),
-        count: rows.length,
-        avgTotal: mean(totalScores),
+        count: row.review_count ?? 0,
+        avgTotal: row.avg_total ?? NaN,
         avgByCategory: {
-          bug: mean(bugScores),
-          maintainability: mean(maintScores),
-          style: mean(styleScores),
-          security: mean(secScores),
+          bug: row.avg_bug ?? NaN,
+          maintainability: row.avg_maintainability ?? NaN,
+          style: row.avg_style ?? NaN,
+          security: row.avg_security ?? NaN,
         },
-      });
-    }
+      };
+    });
+  }, [rawStats]);
 
-    return stats;
-  }, [myReviews]);
-
-  /* ------------ 현재 선택된 Metric 기준 정렬 + Top N ------------ */
-
-  const selectedMetricConfig = METRIC_CONFIG[activeMetric];
-  const SelectedMetricIcon = selectedMetricConfig.icon;
+  /* ------------ 정렬 적용 ------------ */
 
   const sortedStats = useMemo(() => {
     if (!modelStats.length) return [];
-    return [...modelStats].sort((a, b) => {
-      const aVal =
-        activeMetric === "total"
-          ? a.avgTotal
-          : a.avgByCategory[activeMetric as CategoryKey];
-      const bVal =
-        activeMetric === "total"
-          ? b.avgTotal
-          : b.avgByCategory[activeMetric as CategoryKey];
 
-      const av = isNaN(aVal) ? -Infinity : aVal;
-      const bv = isNaN(bVal) ? -Infinity : bVal;
-      return bv - av;
-    });
-  }, [modelStats, activeMetric]);
+    const list = [...modelStats];
 
-  // 🔹 상위 topCount개 모델
-  const topStats = useMemo(() => {
-    return sortedStats.slice(0, topCount);
-  }, [sortedStats, topCount]);
-
-  const topSlots = useMemo<(ModelStats | null)[]>(() => {
-    // ⭐ 여기서 filled 타입을 명시
-    const filled: (ModelStats | null)[] = [...topStats];
-    while (filled.length < topCount) {
-      filled.push(null);
+    if (sortKey === "popular") {
+      list.sort((a, b) => b.count - a.count);
+    } else if (sortKey === "alpha") {
+      list.sort((a, b) =>
+        (a.meta.label ?? a.modelId).localeCompare(
+          b.meta.label ?? b.modelId,
+          "ko"
+        )
+      );
+    } else {
+      // 점수 순: primaryMetric 기준 내림차순
+      list.sort((a, b) => {
+        const getVal = (row: ModelStats): number => {
+          const base =
+            primaryMetric === "total"
+              ? row.avgTotal
+              : row.avgByCategory[primaryMetric];
+          return isNaN(base) ? -Infinity : base;
+        };
+        return getVal(b) - getVal(a);
+      });
     }
-    return filled.slice(0, topCount);
-  }, [topStats, topCount]);
+
+    return list;
+  }, [modelStats, sortKey, primaryMetric]);
 
   /* ------------ 로그인 안 된 경우 ------------ */
 
@@ -298,9 +363,9 @@ export default function Compare() {
           </CardHeader>
           <CardContent className="space-y-2 text-center text-sm text-muted-foreground">
             <p>
-              GitHub로 로그인하면 내가 요청한 리뷰들을 기반으로
+              GitHub로 로그인하면 모델별 리뷰 집계 데이터를
               <br />
-              모델별 성능을 비교해볼 수 있어요.
+              기간/정렬 조건에 맞게 비교해볼 수 있어요.
             </p>
           </CardContent>
         </Card>
@@ -308,10 +373,12 @@ export default function Compare() {
     );
   }
 
+  const hasData = !!sortedStats.length && !statsLoading;
+
   return (
     <div className="space-y-6">
       {/* 에러 표시 */}
-      {error && (
+      {statsError && (
         <Card className="border-red-300 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40">
           <CardContent className="flex items-center justify-between gap-4 p-4 text-sm">
             <div className="flex items-start gap-2">
@@ -319,13 +386,13 @@ export default function Compare() {
               <p className="text-red-700 dark:text-red-200">
                 모델 비교 데이터를 불러오는 중 오류가 발생했습니다.
                 <br />
-                <span className="text-xs opacity-80">({error})</span>
+                <span className="text-xs opacity-80">({statsError})</span>
               </p>
             </div>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => load()}
+              onClick={loadStats}
               className="shrink-0 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-200 dark:hover:bg-red-900/30 cursor-pointer"
             >
               다시 시도
@@ -334,48 +401,92 @@ export default function Compare() {
         </Card>
       )}
 
-      {/* 상단 설명 카드 + Metric 토글 + Top 개수 선택 */}
+      {/* 상단 필터/정렬/메트릭 선택 */}
       <Card>
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between w-full">
-            {/* 🔹 TOP 개수 Select */}
-            <div className="flex items-center gap-2 text-xs text-muted-foreground mr-0 sm:mr-8">
-              <span>표시할 랭킹 개수</span>
-              <Select
-                value={String(topCount)}
-                onValueChange={(value) => setTopCount(Number(value))}
-              >
-                <SelectTrigger className="h-8 w-[90px] rounded-full border-slate-300 bg-background/80 text-xs dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
-                  <SelectValue placeholder={`TOP ${topCount}`} />
-                </SelectTrigger>
-                <SelectContent side="bottom" align="end">
-                  {TOP_COUNT_OPTIONS.map((n) => (
-                    <SelectItem
-                      key={n}
-                      value={String(n)}
-                      className="cursor-pointer"
-                    >
-                      TOP {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex flex-col gap-3 w-full">
+            {/* 기간 & 정렬 */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1 text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <Filter className="h-3 w-3" />
+                  Filters
+                </span>
+
+                {/* 기간 선택 */}
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <Select
+                    value={timeRange}
+                    onValueChange={(value: TimeRangeKey) => setTimeRange(value)}
+                  >
+                    <SelectTrigger className="h-8 w-[120px] rounded-full border-slate-300 bg-background/80 text-xs dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" align="start">
+                      <SelectItem value="week" className="cursor-pointer">
+                        이번주
+                      </SelectItem>
+                      <SelectItem value="month" className="cursor-pointer">
+                        이번달
+                      </SelectItem>
+                      <SelectItem value="year" className="cursor-pointer">
+                        이번년도
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 정렬 선택 */}
+                <div className="flex items-center gap-1">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+                  <Select
+                    value={sortKey}
+                    onValueChange={(value: SortKey) => setSortKey(value)}
+                  >
+                    <SelectTrigger className="h-8 w-[160px] rounded-full border-slate-300 bg-background/80 text-xs dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="bottom" align="start">
+                      <SelectItem value="popular" className="cursor-pointer">
+                        인기 순 (리뷰 수)
+                      </SelectItem>
+                      <SelectItem value="score" className="cursor-pointer">
+                        점수 순
+                      </SelectItem>
+                      <SelectItem value="alpha" className="cursor-pointer">
+                        가나다 순
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {hasData && (
+                <div className="text-right text-[11px] text-slate-500 dark:text-slate-400">
+                  총{" "}
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">
+                    {sortedStats.length}
+                  </span>{" "}
+                  개 모델
+                </div>
+              )}
             </div>
 
-            {/* 🔹 Metric 토글 버튼 */}
-            <div className="flex flex-wrap justify-end gap-2 w-full sm:w-auto">
+            {/* 메트릭 멀티 선택 */}
+            <div className="flex flex-wrap gap-2">
               {(
                 Object.values(METRIC_CONFIG) as Array<
                   (typeof METRIC_CONFIG)[MetricKey]
                 >
               ).map(({ key, label, icon: Icon }) => {
-                const active = activeMetric === key;
+                const active = selectedMetrics.includes(key);
                 return (
                   <Button
                     key={key}
                     size="sm"
                     variant={active ? "default" : "outline"}
-                    onClick={() => setActiveMetric(key)}
+                    onClick={() => handleToggleMetric(key)}
                     className={cn(
                       "flex items-center gap-1.5 rounded-full border text-xs transition-all duration-150 cursor-pointer",
                       active
@@ -385,6 +496,11 @@ export default function Compare() {
                   >
                     <Icon className="h-3 w-3" />
                     <span>{label}</span>
+                    {primaryMetric === key && (
+                      <span className="ml-0.5 rounded-full bg-white/20 px-1.5 text-[9px] uppercase tracking-wide">
+                        기준
+                      </span>
+                    )}
                   </Button>
                 );
               })}
@@ -393,199 +509,214 @@ export default function Compare() {
         </CardHeader>
       </Card>
 
-      {/* 모델별 랭킹 카드 리스트 (Top N) */}
-      <Card>
+      {/* 모델별 랭킹 카드 리스트 (가로 슬라이드) */}
+      <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle className="flex flex-col gap-6 text-sm sm:text-base sm:flex-row sm:items-center ">
-            <span className="flex items-center gap-1">TOP {topCount} 랭킹</span>
+          <CardTitle className="flex flex-col gap-2 text-sm sm:text-base sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex items-center gap-1">
+              모델 랭킹
+              <span className="text-xs text-slate-400">
+                ({TIME_RANGE_LABELS[timeRange]} · {SORT_LABELS[sortKey]})
+              </span>
+            </span>
 
-            <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <SelectedMetricIcon className="h-3.5 w-3.5 text-violet-400" />
-                <span className="hidden sm:inline">
-                  {selectedMetricConfig.label} ·{" "}
-                  {selectedMetricConfig.description}
-                </span>
-                <span className="sm:hidden">
-                  {selectedMetricConfig.label} 기준
-                </span>
-              </div>
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <PrimaryMetricIcon className="h-3.5 w-3.5 text-violet-400" />
+              <span>
+                {primaryMetricConfig.label} 기준 정렬 ·{" "}
+                {primaryMetricConfig.description}
+              </span>
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {isInitialLoading ? (
-            <div
-              className="
-                grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4
-                auto-rows-[minmax(140px,1fr)]
-              "
-            >
-              {Array.from({ length: topCount }).map((_, i) => (
-                <Skeleton key={i} className="h-full rounded-xl" />
-              ))}
+        <CardContent className="pb-4">
+          {statsLoading ? (
+            <div className="-mx-4 md:mx-0">
+              <div className="flex gap-3 overflow-x-auto px-4 pb-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton
+                    key={i}
+                    className="h-[150px] min-w-[220px] rounded-xl"
+                  />
+                ))}
+              </div>
             </div>
-          ) : !myReviews.length ? (
+          ) : !hasData ? (
             <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-              아직 내가 요청한 리뷰 데이터가 없습니다.
+              선택한 기간에 해당하는 모델 집계 데이터가 없습니다.
               <br />
-              Playground나 다른 페이지에서 먼저 코드를 리뷰해보세요.
-            </div>
-          ) : !topStats.length ? (
-            <div className="text-sm text-slate-500">
-              모델별로 집계할 데이터가 없습니다.
+              다른 기간이나 정렬 조건으로 다시 시도해보세요.
             </div>
           ) : (
-            <div
-              className="
-                grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4
-                auto-rows-[minmax(150px,1fr)]
-              "
-            >
-              {topSlots.map((row, index) => {
-                const rank = index + 1;
-                const isTop1 = index === 0;
-                const isTop3 = index < 3;
+            <div className="-mx-4 md:mx-0">
+              <div
+                className="
+                  flex gap-3 overflow-x-auto px-4 pb-3 pt-1
+                  scrollbar-thin scrollbar-thumb-slate-600/60 scrollbar-track-transparent
+                "
+              >
+                {sortedStats.map((row, index) => {
+                  const rank = index + 1;
+                  const isTop1 = rank === 1;
+                  const isTop2 = rank === 2;
+                  const isTop3 = rank === 3;
 
-                // 🔹 빈 슬롯 (데이터 없음)
-                if (!row) {
+                  const getMetricValue = (metric: MetricKey): number => {
+                    return metric === "total"
+                      ? row.avgTotal
+                      : row.avgByCategory[metric];
+                  };
+
+                  const primaryValue = getMetricValue(primaryMetric);
+                  const primaryHasData = !isNaN(primaryValue);
+
+                  const rankBadge =
+                    rank === 1
+                      ? "👑"
+                      : rank === 2
+                      ? "🥈"
+                      : rank === 3
+                      ? "🥉"
+                      : null;
+
                   return (
                     <div
-                      key={`empty-${index}`}
-                      className="flex h-full flex-col justify-between rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-3 text-xs text-slate-400 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-500"
+                      key={row.modelId}
+                      className={cn(
+                        "relative flex h-full min-h-[150px] min-w-[230px] max-w-[260px] flex-col justify-between rounded-2xl border p-3 sm:p-4 text-xs transition-all duration-200 overflow-hidden",
+                        isTop1 &&
+                          "border-violet-400/80 bg-gradient-to-br from-violet-500/25 via-slate-900 to-violet-900/60 shadow-lg shadow-violet-500/50",
+                        !isTop1 &&
+                          isTop2 &&
+                          "border-slate-500/80 bg-slate-900/90 shadow-md shadow-slate-600/40",
+                        !isTop1 &&
+                          !isTop2 &&
+                          isTop3 &&
+                          "border-amber-500/80 bg-slate-900/80 shadow-md shadow-amber-500/40",
+                        !isTop1 &&
+                          !isTop2 &&
+                          !isTop3 &&
+                          "border-slate-700/60 bg-slate-900/70 hover:border-violet-400/80 hover:bg-slate-900"
+                      )}
                     >
-                      {/* 1줄: n위 + 왕관 자리 (비어 있음) */}
+                      {isTop1 && (
+                        <div className="pointer-events-none absolute -top-16 -right-10 h-32 w-32 rounded-full bg-violet-500/25 blur-3xl" />
+                      )}
+
+                      {/* 1줄: 순위 + 아이콘 */}
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-semibold text-slate-500">
-                          {rank}위
-                        </span>
-                      </div>
-
-                      {/* 2줄: 모델 자리 (데이터 없음) */}
-                      <div className="mt-1 flex items-center gap-2 min-h-[1.5rem]">
-                        <span className="inline-flex items-center rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[11px] dark:border-slate-700">
-                          데이터 없음
-                        </span>
-                      </div>
-
-                      {/* 3줄: 점수 + 표본 */}
-                      <div className="mt-3 flex items-end justify-between">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-xl font-bold tracking-tight tabular-nums text-slate-400">
-                            -
-                          </span>
-                          <span className="text-[11px] text-slate-400">
-                            / 100
+                        <div className="flex items-center gap-1">
+                          <span
+                            className={cn(
+                              "text-[11px] font-semibold",
+                              isTop1
+                                ? "text-violet-100"
+                                : isTop2
+                                ? "text-slate-100"
+                                : isTop3
+                                ? "text-amber-100"
+                                : "text-slate-300"
+                            )}
+                          >
+                            {rank}위
                           </span>
                         </div>
-                        <span className="text-[11px] text-slate-400">
-                          표본 0개
+                        {rankBadge && (
+                          <span className="text-lg drop-shadow">
+                            {rankBadge}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* 2줄: 모델 정보 */}
+                      <div className="mt-1 min-h-[1.5rem]">
+                        <ModelInfoRow
+                          meta={row.meta}
+                          compact
+                          showCountInline={false}
+                        />
+                      </div>
+
+                      {/* 3줄: 주요 점수 + 표본 수 */}
+                      <div className="mt-3 flex items-end justify-between">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-baseline gap-1">
+                            <span
+                              className={cn(
+                                "font-bold tracking-tight tabular-nums",
+                                isTop1
+                                  ? "text-2xl text-violet-50"
+                                  : isTop2
+                                  ? "text-xl text-slate-50"
+                                  : isTop3
+                                  ? "text-xl text-amber-100"
+                                  : "text-xl text-slate-100"
+                              )}
+                            >
+                              {primaryHasData ? primaryValue.toFixed(1) : "-"}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              / 100
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            {primaryMetricConfig.label}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-300">
+                          표본 {row.count}개
                         </span>
                       </div>
-                    </div>
-                  );
-                }
 
-                const value =
-                  activeMetric === "total"
-                    ? row.avgTotal
-                    : row.avgByCategory[activeMetric as CategoryKey];
-
-                const hasData = !isNaN(value);
-
-                return (
-                  <div
-                    key={row.modelId}
-                    className={cn(
-                      "relative flex h-full flex-col justify-between rounded-xl border p-3 sm:p-4 text-xs transition-all duration-200 overflow-hidden",
-                      isTop1 &&
-                        "border-violet-400/80 bg-gradient-to-br from-violet-500/25 via-slate-900 to-violet-900/60 shadow-lg shadow-violet-500/50",
-                      !isTop1 &&
-                        isTop3 &&
-                        "border-violet-500/60 bg-slate-900/80 shadow-md shadow-violet-500/30",
-                      !isTop3 &&
-                        "border-slate-700/60 bg-slate-900/70 hover:border-violet-400/80 hover:bg-slate-900"
-                    )}
-                  >
-                    {/* 👑 1등 왕관 - n위 오른쪽 */}
-                    {isTop1 && (
-                      <>
-                        <div className="pointer-events-none absolute -top-16 -right-10 h-32 w-32 rounded-full bg-violet-500/25 blur-3xl" />
-                      </>
-                    )}
-
-                    {/* 1줄: n위 + 왕관 아이콘 */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <span
-                          className={cn(
-                            "text-[11px] font-semibold",
-                            isTop1
-                              ? "text-violet-100"
-                              : isTop3
-                              ? "text-violet-200"
-                              : "text-slate-300"
-                          )}
-                        >
-                          {rank}위
-                        </span>
-                      </div>
-                      {isTop1 && (
-                        <span className="text-lg drop-shadow">👑</span>
+                      {/* 4줄: 선택된 다른 메트릭들 미니 뱃지 */}
+                      {selectedMetrics.length > 1 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {selectedMetrics.map((metric) => {
+                            if (metric === primaryMetric) return null;
+                            const cfg = METRIC_CONFIG[metric];
+                            const val = getMetricValue(metric);
+                            const has = !isNaN(val);
+                            const MetricIcon = cfg.icon;
+                            return (
+                              <div
+                                key={metric}
+                                className="inline-flex items-center gap-1 rounded-full border border-slate-600/80 bg-slate-900/80 px-2 py-0.5 text-[10px] text-slate-200"
+                              >
+                                <MetricIcon className="h-3 w-3 text-slate-300" />
+                                <span className="font-medium">
+                                  {cfg.shortLabel}
+                                </span>
+                                <span className="tabular-nums">
+                                  {has ? val.toFixed(1) : "-"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
-
-                    {/* 2줄: 모델 */}
-                    <div className="mt-1 min-h-[1.5rem]">
-                      <ModelInfoRow
-                        meta={row.meta}
-                        compact
-                        showCountInline={false}
-                      />
-                    </div>
-
-                    {/* 3줄: 점수 + 표본 개수 */}
-                    <div className="mt-3 flex items-end justify-between">
-                      <div className="flex items-baseline gap-1">
-                        <span
-                          className={cn(
-                            "font-bold tracking-tight tabular-nums",
-                            isTop1
-                              ? "text-2xl text-violet-50"
-                              : isTop3
-                              ? "text-xl text-violet-100"
-                              : "text-xl text-slate-100"
-                          )}
-                        >
-                          {hasData ? value.toFixed(1) : "-"}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          / 100
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-300">
-                        표본 {row.count}개
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* 상세 테이블: 상위 N개 모델 x 카테고리 */}
-      {!isInitialLoading && !!topStats.length && (
+      {/* 상세 테이블: 현재 정렬 순서대로 전체 출력 */}
+      {hasData && (
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">
-              TOP {topCount}개 모델 카테고리별 평균 점수
+              모델별 카테고리 평균 점수
+              <span className="ml-1 text-xs font-normal text-slate-400">
+                ({TIME_RANGE_LABELS[timeRange]} · {SORT_LABELS[sortKey]})
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <div className="min-w-[720px]">
-              <div className="grid grid-cols-[minmax(52px,0.5fr)_2.4fr_repeat(5,minmax(80px,1fr))] gap-2 pb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <div className="grid grid-cols-[minmax(52px,0.5fr)_2.4fr_repeat(5,minmax(80px,1fr))] gap-2 pb-2 text-xs font-semibold text-slate-200">
                 <div className="text-center">순위</div>
                 <div>모델</div>
                 <div className="text-center">총점</div>
@@ -595,44 +726,19 @@ export default function Compare() {
                 <div className="text-center">Security</div>
               </div>
 
-              {topSlots.map((row, index) => {
+              {sortedStats.map((row, index) => {
                 const rank = index + 1;
-
-                if (!row) {
-                  // 🔹 테이블 빈 슬롯
-                  return (
-                    <div
-                      key={`empty-row-${index}`}
-                      className="grid grid-cols-[minmax(52px,0.5fr)_2.4fr_repeat(5,minmax(80px,1fr))] gap-2 border-t border-slate-200 py-2 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-500"
-                    >
-                      <div className="flex items-center justify-center text-[11px]">
-                        {rank}위
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[11px] dark:border-slate-700">
-                          데이터 없음
-                        </span>
-                      </div>
-                      <div className="text-center">-</div>
-                      <div className="text-center">-</div>
-                      <div className="text-center">-</div>
-                      <div className="text-center">-</div>
-                      <div className="text-center">-</div>
-                    </div>
-                  );
-                }
-
                 return (
                   <div
                     key={row.modelId}
-                    className="grid grid-cols-[minmax(52px,0.5fr)_2.4fr_repeat(5,minmax(80px,1fr))] gap-2 border-t border-slate-200 py-2 text-xs dark:border-slate-800"
+                    className="grid grid-cols-[minmax(52px,0.5fr)_2.4fr_repeat(5,minmax(80px,1fr))] gap-2 border-t border-slate-800 py-2 text-xs"
                   >
                     {/* 순위 */}
-                    <div className="flex items-center justify-center text-[11px] font-semibold text-slate-600 dark:text-slate-200">
+                    <div className="flex items-center justify-center text-[11px] font-semibold text-slate-200">
                       {rank}위
                     </div>
 
-                    {/* 모델 정보 + 여기서는 표본 수 같이 표시 */}
+                    {/* 모델 정보 + 표본 수 */}
                     <ModelInfoRow
                       meta={row.meta}
                       count={row.count}

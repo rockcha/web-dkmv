@@ -183,3 +183,31 @@
     transform: translateY(-2px) scale(1.015);
   }
 }
+
+@keyframes wiggle-right {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px); /* 👉 오른쪽으로 살짝 */
+  }
+}
+
+@keyframes wiggle-left {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-4px); /* 👈 왼쪽으로 살짝 */
+  }
+}
+
+.animate-wiggle-right {
+  animation: wiggle-right 1.1s ease-in-out infinite;
+}
+
+.animate-wiggle-left {
+  animation: wiggle-left 1.1s ease-in-out infinite;
+}

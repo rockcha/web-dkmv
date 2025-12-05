@@ -17,19 +17,20 @@ import {
   FlaskConical,
   FileBarChart,
   Settings as SettingsIcon,
-  ChevronLeft,
-  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 
 import { Toaster } from "@/components/ui/sonner";
 
-/** ===== 네비 아이템 ===== */
+/** ===== 네비 아이템 타입 ===== */
 type NavItem = {
   to: string;
   label: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
 
+/** ===== 네비게이션 아이템 목록 ===== */
 const NAV_ITEMS: NavItem[] = [
   { to: "/mypage/dashboard", label: "대시보드", icon: LayoutDashboard },
   { to: "/mypage/analyses", label: "분석 내역", icon: ListChecks },
@@ -138,22 +139,19 @@ export default function AppLayout() {
                     <button
                       type="button"
                       onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-                      className="
-                        ml-auto flex h-8 w-8 items-center justify-center
-                        rounded-full border border-slate-200 dark:border-slate-700
-                        bg-white/80 dark:bg-slate-900/80
-                        shadow-sm
-                        hover:bg-slate-100 dark:hover:bg-slate-800
-                        transition-all duration-200
-                      "
                       aria-label={
                         isSidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"
                       }
+                      className="transition-all duration-300 ease hover:scale-110 "
                     >
                       {isSidebarCollapsed ? (
-                        <ChevronRight className="size-4 text-slate-600 dark:text-slate-300" />
+                        <span className="inline-flex items-center justify-center animate-wiggle-right">
+                          <ChevronsRight className=" cursor-pointer ml-3 h-6 w-6 text-slate-700 dark:text-slate-200" />
+                        </span>
                       ) : (
-                        <ChevronLeft className="size-4 text-slate-600 dark:text-slate-300" />
+                        <span className="inline-flex items-center justify-center animate-wiggle-left">
+                          <ChevronsLeft className=" cursor-pointer h-6 w-6 text-slate-700 dark:text-slate-200" />
+                        </span>
                       )}
                     </button>
                   </div>
@@ -170,17 +168,30 @@ export default function AppLayout() {
                               isActive: boolean;
                             }) => {
                               const base =
-                                "group relative flex items-center rounded-xl px-3 py-3 text-[15px] md:text-base transition-all";
+                                "group relative flex items-center rounded-lg border border-transparent px-3 py-3 text-[15px] md:text-base transition-all";
                               const layout = isSidebarCollapsed
                                 ? "justify-center"
                                 : "gap-3.5";
 
-                              const hoverExpanded =
-                                "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-900 dark:hover:text-slate-100";
-                              const hoverCollapsed = "hover:bg-transparent"; // 접혔을 땐 배경 그대로
+                              // ✅ 비활성일 때만 호버 효과. 활성(선택)된 건 hover에도 그대로.
+                              const hoverExpanded = isActive
+                                ? ""
+                                : `
+                                  hover:bg-violet-50/90
+                                  hover:text-violet-900
+                                  dark:hover:bg-violet-900/70
+                                  dark:hover:text-violet-100
+                                  hover:border-violet-200
+                                  dark:hover:border-violet-500
+                                  hover:shadow-sm
+                                `;
+                              const hoverCollapsed = isActive
+                                ? ""
+                                : "hover:bg-transparent";
 
+                              // ✅ 활성된 메뉴: 보라 배경 + 흰 글씨, 덜 둥글게, 선도 보라
                               const activeBase = isActive
-                                ? "font-semibold text-violet-600 dark:text-white bg-violet-50 dark:bg-violet-950/40"
+                                ? "font-semibold text-white bg-violet-500 dark:bg-violet-500 shadow-sm border-violet-500"
                                 : "text-slate-600 dark:text-slate-300";
 
                               return [
@@ -193,18 +204,18 @@ export default function AppLayout() {
                               ].join(" ");
                             }}
                           >
-                            {/* 아이콘: active 시 부모 텍스트색을 따라 보라색, hover 시 더 진해짐 */}
+                            {/* 아이콘 */}
                             <Icon
                               className="
                                 size-5
                                 transition-all duration-200 ease-out
                                 group-hover:scale-110
-                                group-hover:text-violet-500
-                                dark:group-hover:text-violet-400
+                                group-hover:text-violet-600
+                                dark:group-hover:text-violet-300
                               "
                             />
 
-                            {/* 라벨: 접히면 부드럽게 사라지고, 펼치면 부드럽게 나타남 */}
+                            {/* 라벨: 접히면 사라지고, 펼치면 나타남 */}
                             <span
                               className={`
                                 truncate
