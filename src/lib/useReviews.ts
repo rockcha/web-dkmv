@@ -16,6 +16,7 @@ export type ScoresByCategory = Record<CategoryKey, number>;
 export type CommentsByCategory = Partial<Record<CategoryKey, string>> &
   Record<string, string>;
 
+/** 리뷰 한 건 */
 export type ReviewItem = {
   review_id: number;
   github_id: string | null;
@@ -24,9 +25,14 @@ export type ReviewItem = {
   language: string | null;
   quality_score: number;
   summary: string;
+  /** 카테고리별 점수 */
   scores_by_category: ScoresByCategory;
+  /** 카테고리별 코멘트 */
   comments: CommentsByCategory;
+  /** 리뷰 시각 (ISO 문자열) */
   audit: string;
+  /** 🔹 원본 코드 (없을 수도 있으므로 optional) */
+  code?: string | null;
 };
 
 export type ReviewListResponse = {
@@ -74,8 +80,13 @@ export function useReviews(options: UseReviewsOptions = {}) {
       setError("");
       const res = (await fetchReviews()) as ReviewListResponse;
       setAllReviews(Array.isArray(res.body) ? res.body : []);
-    } catch (e: any) {
-      setError(String(e?.message || e));
+    } catch (e: unknown) {
+      // 🔹 any 대신 unknown 사용해서 eslint(no-explicit-any)도 해결
+      if (e instanceof Error) {
+        setError(e.message);
+      } else {
+        setError(String(e));
+      }
     } finally {
       setLoading(false);
     }
