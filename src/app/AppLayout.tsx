@@ -45,13 +45,13 @@ const NAV_ITEMS: NavItem[] = [
 export default function AppLayout() {
   const { pathname } = useLocation();
 
-  /** ✅ 랜딩(/, /landing)에서는 헤더만 보이게 */
+  /** 랜딩(/, /landing) */
   const isLanding = pathname === "/" || pathname.startsWith("/landing");
 
-  /** ✅ 마이페이지 영역 (/mypage/...) 인지 여부 */
+  /** 마이페이지 (/mypage/...) */
   const isMyPage = pathname.startsWith("/mypage");
 
-  /** ✅ 마이페이지 사이드바 접힘 상태 */
+  /** 마이페이지 사이드바 접힘 상태 */
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
   const currentYear = new Date().getFullYear();
@@ -59,7 +59,7 @@ export default function AppLayout() {
   return (
     <>
       {isLanding ? (
-        // ───────── 랜딩 레이아웃: 헤더 + 컨텐츠 + 푸터 = 100vh ─────────
+        // ───────── 랜딩 레이아웃 ─────────
         <div
           className="
             min-h-screen w-full
@@ -98,7 +98,7 @@ export default function AppLayout() {
           </footer>
         </div>
       ) : isMyPage ? (
-        // ───────── /mypage/* 레이아웃 (사이드바 + 타이틀) ─────────
+        // ───────── /mypage/* 레이아웃 ─────────
         <DummyDataProvider>
           <div
             className="
@@ -142,15 +142,15 @@ export default function AppLayout() {
                       aria-label={
                         isSidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"
                       }
-                      className="transition-all duration-300 ease hover:scale-110 "
+                      className="transition-all duration-300 ease hover:scale-110"
                     >
                       {isSidebarCollapsed ? (
                         <span className="inline-flex items-center justify-center animate-wiggle-right">
-                          <ChevronsRight className=" cursor-pointer ml-3 h-6 w-6 text-slate-700 dark:text-slate-200" />
+                          <ChevronsRight className="cursor-pointer ml-3 h-6 w-6 text-slate-700 dark:text-slate-200" />
                         </span>
                       ) : (
                         <span className="inline-flex items-center justify-center animate-wiggle-left">
-                          <ChevronsLeft className=" cursor-pointer h-6 w-6 text-slate-700 dark:text-slate-200" />
+                          <ChevronsLeft className="cursor-pointer h-6 w-6 text-slate-700 dark:text-slate-200" />
                         </span>
                       )}
                     </button>
@@ -168,30 +168,37 @@ export default function AppLayout() {
                               isActive: boolean;
                             }) => {
                               const base =
-                                "group relative flex items-center rounded-lg border border-transparent px-3 py-3 text-[15px] md:text-base transition-all";
+                                "group relative flex items-center rounded-lg border border-transparent px-3 py-3 text-[15px] md:text-base transition-all transform";
                               const layout = isSidebarCollapsed
                                 ? "justify-center"
                                 : "gap-3.5";
 
-                              // ✅ 비활성일 때만 호버 효과. 활성(선택)된 건 hover에도 그대로.
+                              // 펼쳐진 상태에서의 hover
                               const hoverExpanded = isActive
                                 ? ""
                                 : `
                                   hover:bg-violet-50/90
                                   hover:text-violet-900
+                                  hover:translate-x-1
                                   dark:hover:bg-violet-900/70
                                   dark:hover:text-violet-100
                                   hover:border-violet-200
                                   dark:hover:border-violet-500
                                   hover:shadow-sm
                                 `;
+
+                              // 접힌 상태에서는 배경/이동 없이 심플하게
                               const hoverCollapsed = isActive
                                 ? ""
                                 : "hover:bg-transparent";
 
-                              // ✅ 활성된 메뉴: 보라 배경 + 흰 글씨, 덜 둥글게, 선도 보라
                               const activeBase = isActive
-                                ? "font-semibold text-white bg-violet-500 dark:bg-violet-500 shadow-sm border-violet-500"
+                                ? `
+                                    font-semibold text-white
+                                    bg-violet-500 dark:bg-violet-500
+                                    border-violet-500 shadow-sm shadow-violet-500/30
+                                    translate-x-0.5
+                                  `
                                 : "text-slate-600 dark:text-slate-300";
 
                               return [
@@ -204,22 +211,55 @@ export default function AppLayout() {
                               ].join(" ");
                             }}
                           >
-                            {/* 아이콘 */}
-                            <Icon
-                              className="
-                                size-5
-                                transition-all duration-200 ease-out
-                                group-hover:scale-110
-                                group-hover:text-violet-600
-                                dark:group-hover:text-violet-300
-                              "
-                            />
+                            {/* 왼쪽 보라 인디케이터 바 (펼쳐진 상태에서만) */}
+                            {!isSidebarCollapsed && (
+                              <span
+                                className="
+                                  pointer-events-none
+                                  absolute left-1 top-1/2 -translate-y-1/2
+                                  h-7 w-[3px]
+                                  rounded-full bg-violet-500
+                                  origin-center
+                                  scale-y-0 opacity-0
+                                  transition-transform duration-300
+                                  group-hover:scale-y-100
+                                  group-hover:opacity-100
+                                "
+                              />
+                            )}
 
-                            {/* 라벨: 접히면 사라지고, 펼치면 나타남 */}
+                            {/* 아이콘 + 글로우 래퍼 */}
+                            <span className="relative flex items-center justify-center">
+                              {/* 아이콘 뒤 글로우 */}
+                              <span
+                                className={`
+                                  absolute inset-0
+                                  rounded-full
+                                  bg-violet-500/8 dark:bg-violet-400/15
+                                  blur-sm
+                                  opacity-0
+                                  transition-opacity duration-200
+                                  ${isSidebarCollapsed ? "w-7 h-7" : "w-7 h-7"}
+                                  group-hover:opacity-100
+                                `}
+                              />
+                              <Icon
+                                className={`
+                                  relative z-10 size-5
+                                  transition-all duration-200 ease-out
+                                  ${
+                                    isSidebarCollapsed
+                                      ? "group-hover:scale-125 group-hover:-translate-y-0.5"
+                                      : "group-hover:animate-wiggle-rotate group-hover:text-violet-600 dark:group-hover:text-violet-300"
+                                  }
+                                `}
+                              />
+                            </span>
+
+                            {/* 라벨 + 밑줄 */}
                             <span
                               className={`
-                                truncate
-                                transition-all duration-300
+                                relative flex items-center truncate transition-all duration-300
                                 ${
                                   isSidebarCollapsed
                                     ? "max-w-0 opacity-0 ml-0"
@@ -227,8 +267,48 @@ export default function AppLayout() {
                                 }
                               `}
                             >
-                              {label}
+                              {/* 텍스트 */}
+                              <span className="whitespace-nowrap">{label}</span>
+
+                              {/* 보라 밑줄: 펼쳐져 있을 때만 슬라이드 인 */}
+                              {!isSidebarCollapsed && (
+                                <span
+                                  className="
+                                    pointer-events-none
+                                    absolute -bottom-0.5 left-0
+                                    h-[2px] w-full
+                                    rounded-full bg-violet-500
+                                    transform origin-left
+                                    scale-x-0 -translate-x-2
+                                    opacity-0
+                                    transition-all duration-300 ease-out
+                                    group-hover:scale-x-100
+                                    group-hover:translate-x-0
+                                    group-hover:opacity-100
+                                  "
+                                />
+                              )}
                             </span>
+
+                            {/* 접힌 상태에서 툴팁 */}
+                            {isSidebarCollapsed && (
+                              <span
+                                className="
+                                  pointer-events-none
+                                  absolute left-full ml-2
+                                  rounded-lg bg-slate-900/90 text-xs text-slate-50
+                                  px-2 py-1
+                                  opacity-0 translate-x-2
+                                  group-hover:opacity-100
+                                  group-hover:translate-x-0
+                                  shadow-lg
+                                  whitespace-nowrap
+                                  z-50
+                                "
+                              >
+                                {label}
+                              </span>
+                            )}
                           </NavLink>
                         </li>
                       ))}
@@ -246,7 +326,7 @@ export default function AppLayout() {
               </aside>
 
               {/* ========== 메인 컨텐츠 ========== */}
-              <main className="p-6 ">
+              <main className="p-6">
                 <PageHeader pathname={pathname} />
                 <section aria-live="polite">
                   <Outlet />
@@ -256,7 +336,7 @@ export default function AppLayout() {
           </div>
         </DummyDataProvider>
       ) : (
-        // ───────── 그 외 일반 페이지 (/download, /about 등) ─────────
+        // ───────── 일반 페이지 (/download, /about 등) ─────────
         <div
           className="
             min-h-screen w-full
@@ -287,7 +367,7 @@ function PageHeader({ pathname }: { pathname: string }) {
   const CurrentIcon = current?.icon ?? LayoutDashboard;
 
   return (
-    <header className=" flex items-center gap-3" aria-label="페이지 제목">
+    <header className="flex items-center gap-3 mb-4" aria-label="페이지 제목">
       <CurrentIcon className="size-6 text-violet-600 dark:text-violet-400" />
       <h1 className="text-2xl md:text-[26px] font-semibold">
         {current?.label ?? "페이지"}

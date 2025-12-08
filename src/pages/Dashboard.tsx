@@ -340,13 +340,13 @@ export default function Dashboard() {
       <Card className="dark:border-white/50">
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
-            <CardTitle>점수 추이 (총점 & 유형별)</CardTitle>
+            <CardTitle>유형별 점수 변화 </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
               선택한 지표 기준으로 리뷰 순서에 따른 점수 변화를 보여줘요.
             </p>
           </div>
 
-          {/* 🔹 메트릭 토글 버튼 그룹 */}
+          {/* 🔹 메트릭 토글 배지 */}
           <div className="flex flex-wrap justify-end gap-2">
             {(
               Object.values(METRIC_CONFIG) as Array<
@@ -354,34 +354,48 @@ export default function Dashboard() {
               >
             ).map(({ key, label, icon: Icon, color }) => {
               const isActive = activeMetric === key;
+
+              // 살짝 채도만 낮춘 느낌을 위해 알파만 조절
+              const activeBg = color; // 풀 채도
+              const inactiveBg = `${color}33`; // 같은 색 + 낮은 알파 (약간 흐릿)
+
               return (
                 <Button
                   key={key}
+                  type="button"
                   size="sm"
-                  variant={isActive ? "default" : "outline"}
+                  variant="ghost"
                   onClick={() => setActiveMetric(key)}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-full border text-xs cursor-pointer",
-                    !isActive &&
-                      "bg-background/60 text-slate-500 dark:text-slate-300",
-                    isActive && "shadow-sm"
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all border",
+                    "cursor-pointer shadow-sm",
+                    isActive
+                      ? "scale-[1.02]"
+                      : "opacity-90 hover:opacity-100 hover:scale-[1.01]"
                   )}
                   style={
                     isActive
                       ? {
-                          backgroundColor: `${color}40`,
-                          borderColor: `${color}60`,
-                          color: "white",
+                          backgroundColor: activeBg,
+                          borderColor: activeBg,
+                          color: "#ffffff",
                         }
-                      : undefined
+                      : {
+                          // 같은 이미지 유지, 채도만 낮춘 느낌
+                          backgroundColor: inactiveBg,
+                          borderColor: `${color}80`,
+                          color: "#ffffffcc",
+                        }
                   }
                 >
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: color }}
+                  {/* 점(네모) 제거하고 아이콘 + 텍스트만 */}
+                  <Icon
+                    className="h-3.5 w-3.5"
+                    style={{
+                      color: isActive ? "#ffffff" : "#ffffffdd",
+                    }}
                   />
-                  <Icon className="h-3 w-3" />
-                  <span>{label}</span>
+                  <span className="tracking-tight">{label}</span>
                 </Button>
               );
             })}

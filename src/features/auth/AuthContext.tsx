@@ -17,6 +17,9 @@ export type AuthUser = {
   name?: string | null;
   avatar_url?: string | null;
   created_at?: string;
+
+  // ✅ /api/v1/users/me 에서 내려오는 원본 코드 저장 여부 (optional)
+  store_code?: boolean;
 };
 
 type AuthContextValue = {
@@ -25,6 +28,9 @@ type AuthContextValue = {
   isLoading: boolean;
   refresh: () => Promise<AuthUser | null>;
   logout: () => Promise<void>;
+
+  // ✅ Settings 페이지에서 store_code 바꿀 때 /me 캐시 업데이트용
+  setUserStoreCode: (value: boolean) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -103,12 +109,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // ✅ store_code만 부분적으로 업데이트할 때 사용
+  const setUserStoreCode = useCallback((value: boolean) => {
+    setUser((prev) => (prev ? { ...prev, store_code: value } : prev));
+  }, []);
+
   const value: AuthContextValue = {
     user,
     isAuthenticated: !!user,
     isLoading,
     refresh,
     logout,
+    setUserStoreCode,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

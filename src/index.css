@@ -211,3 +211,20 @@
 .animate-wiggle-left {
   animation: wiggle-left 1.1s ease-in-out infinite;
 }
+
+@keyframes wiggle-rotate {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-45deg);
+  }
+  75% {
+    transform: rotate(45deg);
+  }
+}
+
+.animate-wiggle-rotate {
+  animation: wiggle-rotate 0.35s ease-in-out infinite;
+}

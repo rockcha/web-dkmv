@@ -18,6 +18,8 @@ import {
   ShieldCheck,
   Calendar,
   ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   Select,
@@ -145,8 +147,7 @@ function ModelInfoRow({
     meta.label || meta.id.replace(`${meta.provider}/`, "") || meta.id;
 
   return (
-    <div className="flex flex-col min-w-0 items-center gap-2">
-      {/* Provider 칩 */}
+    <div className="flex min-w-0 flex-col items-center gap-1.5">
       <Badge
         variant="outline"
         className={cn(
@@ -157,7 +158,6 @@ function ModelInfoRow({
         {meta.provider}
       </Badge>
 
-      {/* 모델 이름 */}
       <span
         className={cn(
           "truncate text-xs font-semibold text-slate-100",
@@ -203,7 +203,7 @@ type ModelStats = {
   avgByCategory: Record<CategoryKey, number>;
 };
 
-// 카드 하나의 최소 너비 기준 (Tailwind min-w-[230px] 참고)
+// 카드 1개 기준 최소 폭(px)
 const CARD_MIN_WIDTH = 230;
 
 /* =======================
@@ -258,52 +258,30 @@ export default function Compare() {
   const [statsError, setStatsError] = useState<string | null>(null);
 
   // 🔹 필터/정렬 상태
-  const [timeRange, setTimeRange] = useState<TimeRangeKey>("week"); // 기본: 이번주
-  const [sortKey, setSortKey] = useState<SortKey>("popular"); // 기본: 인기 순
+  const [timeRange, setTimeRange] = useState<TimeRangeKey>("week");
+  const [sortKey, setSortKey] = useState<SortKey>("popular");
 
-  // 🔹 선택 지표 (총점 + 카테고리 전부 동일하게 토글)
+  // 🔹 선택 지표
   const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>([
     "total",
   ]);
 
-  // 🔹 가로 리스트 페이지네이션 & 선택된 모델
-  const [page, setPage] = useState(0);
+  // 🔹 선택된 모델
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
 
-  // 🔹 부모 width 에 따라 동적으로 pageSize 계산
-  const [pageSize, setPageSize] = useState(5);
+  // 🔹 카드 뷰 페이지네이션 (width 안에서만 보여주기)
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(3);
   const listContainerRef = useRef<HTMLDivElement | null>(null);
 
   const isScoreSort = sortKey === "score";
 
-  useEffect(() => {
-    const el = listContainerRef.current;
-    if (!el || typeof window === "undefined") return;
-
-    const updatePageSize = () => {
-      const width = el.clientWidth || el.offsetWidth || 0;
-      if (!width) return;
-      const perPage = Math.max(1, Math.floor(width / (CARD_MIN_WIDTH + 16)));
-      setPageSize(perPage);
-    };
-
-    updatePageSize();
-
-    window.addEventListener("resize", updatePageSize);
-
-    return () => {
-      window.removeEventListener("resize", updatePageSize);
-    };
-  }, []);
-
   const handleToggleMetric = (key: MetricKey) => {
-    // 🔒 점수 순이 아닐 때는 지표 뱃지 조작 불가
     if (!isScoreSort) return;
 
     setSelectedMetrics((prev) => {
       const exists = prev.includes(key);
       if (exists) {
-        // 최소 1개는 유지
         if (prev.length === 1) return prev;
         return prev.filter((m) => m !== key);
       }
@@ -392,7 +370,6 @@ export default function Compare() {
     }
 
     if (used === 0) return -Infinity;
-    // 🔢 선택한 지표 개수로 나누어 평균 (예: 총점+Bug+Style 선택 시 3개로 나눔)
     return sum / used;
   };
 
@@ -413,7 +390,6 @@ export default function Compare() {
         )
       );
     } else {
-      // 점수 순: 선택 지표 평균 기준 내림차순
       list.sort((a, b) => getAverageMetric(b) - getAverageMetric(a));
     }
 
@@ -423,27 +399,52 @@ export default function Compare() {
   const hasData = !!sortedStats.length && !statsLoading;
   const topModel = hasData ? sortedStats[0] : null;
 
-  const safePageSize = Math.max(1, pageSize);
-  const pageCount = Math.max(1, Math.ceil(sortedStats.length / safePageSize));
+  // 🔹 부모 width 기반으로 한 페이지에 몇 개 보여줄지 계산
+  useEffect(() => {
+    const el = listContainerRef.current;
+    if (!el || typeof window === "undefined") return;
 
-  // 필터/정렬/지표 바뀌면 페이지 초기화
+    const updatePageSize = () => {
+      const width = el.clientWidth || el.offsetWidth || 0;
+      if (!width) return;
+
+      // 카드 하나 최소 폭 + 대략적인 gap 고려
+      const perPage = Math.max(1, Math.floor(width / (CARD_MIN_WIDTH + 16)));
+      setPageSize(perPage);
+    };
+
+    updatePageSize();
+    window.addEventListener("resize", updatePageSize);
+    return () => {
+      window.removeEventListener("resize", updatePageSize);
+    };
+  }, []);
+
+  const safePageSize = Math.max(1, pageSize);
+  const pageCount = Math.max(
+    1,
+    Math.ceil(sortedStats.length / safePageSize || 1)
+  );
+
+  // 필터/정렬/지표 바뀌면 페이지 리셋
   useEffect(() => {
     setPage(0);
-  }, [timeRange, sortKey, selectedMetrics.join(","), rawStats]);
+  }, [timeRange, sortKey, selectedMetrics.join(","), sortedStats.length]);
 
   // 페이지 범위 보정
   useEffect(() => {
-    const maxPage = Math.max(
-      0,
-      Math.ceil(sortedStats.length / safePageSize) - 1
-    );
+    const maxPage = Math.max(0, pageCount - 1);
     if (page > maxPage) {
-      setPage(0);
+      setPage(maxPage);
     }
-  }, [sortedStats, page, safePageSize]);
+  }, [page, pageCount]);
 
   const startIndex = page * safePageSize;
-  const pagedStats = sortedStats.slice(startIndex, startIndex + safePageSize);
+  const endIndex = Math.min(sortedStats.length, startIndex + safePageSize);
+  const pagedStats = sortedStats.slice(startIndex, endIndex);
+
+  const canPrev = page > 0;
+  const canNext = page < pageCount - 1;
 
   // 선택된 모델 기본값 & 유효성 유지
   useEffect(() => {
@@ -484,7 +485,7 @@ export default function Compare() {
               size="sm"
               variant="outline"
               onClick={loadStats}
-              className="shrink-0 border-red-300 text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-200 dark:hover:bg-red-900/30 cursor-pointer"
+              className="shrink-0 cursor-pointer border-red-300 text-red-700 hover:bg-red-100 dark:border-red-800 dark:text-red-200 dark:hover:bg-red-900/30"
             >
               다시 시도
             </Button>
@@ -493,9 +494,9 @@ export default function Compare() {
       )}
 
       {/* 상단 필터/정렬/지표 선택 */}
-      <Card>
+      <Card className="mt-3">
         <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-3 w-full">
+          <div className="flex w-full flex-col gap-3">
             {/* 기간 & 정렬 */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-4 font-bold text-muted-foreground">
@@ -506,7 +507,7 @@ export default function Compare() {
                     value={timeRange}
                     onValueChange={(value: TimeRangeKey) => setTimeRange(value)}
                   >
-                    <SelectTrigger className="h-8 w-[120px] rounded-full border-slate-300 bg-background/80 text-sm dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
+                    <SelectTrigger className="h-8 w-[120px] cursor-pointer rounded-full border-slate-300 bg-background/80 text-sm dark:border-slate-700 dark:bg-slate-900/70">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent side="bottom" align="start">
@@ -530,7 +531,7 @@ export default function Compare() {
                     value={sortKey}
                     onValueChange={(value: SortKey) => setSortKey(value)}
                   >
-                    <SelectTrigger className="h-8 w-[160px] rounded-full border-slate-300 bg-background/80 text-sm dark:border-slate-700 dark:bg-slate-900/70 cursor-pointer">
+                    <SelectTrigger className="h-8 w-[160px] cursor-pointer rounded-full border-slate-300 bg-background/80 text-sm dark:border-slate-700 dark:bg-slate-900/70">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent side="bottom" align="start">
@@ -549,7 +550,7 @@ export default function Compare() {
               </div>
             </div>
 
-            {/* 지표 멀티 선택 (총점 + 유형 동일 취급) */}
+            {/* 지표 멀티 선택 */}
             <div className="flex flex-col gap-1.5">
               <div className="flex flex-wrap gap-2">
                 {(
@@ -573,12 +574,12 @@ export default function Compare() {
                       disabled={!isScoreSort}
                       onClick={() => handleToggleMetric(key)}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full border text-xs transition-all duration-150 px-3 py-1",
+                        "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all duration-150",
                         active
                           ? "border-violet-500 bg-violet-600/90 text-white shadow-sm shadow-violet-500/40 hover:bg-violet-500"
                           : "bg-background/70 text-slate-500 dark:text-slate-300 hover:border-violet-300 hover:bg-violet-50/60 hover:text-violet-600 dark:hover:border-violet-500/70 dark:hover:bg-violet-500/10 dark:hover:text-violet-200",
                         !isScoreSort &&
-                          "opacity-50 cursor-not-allowed hover:border-slate-700 hover:bg-background/70 hover:text-slate-400 dark:hover:bg-slate-900"
+                          "cursor-not-allowed opacity-50 hover:border-slate-700 hover:bg-background/70 hover:text-slate-400 dark:hover:bg-slate-900"
                       )}
                     >
                       <Icon className="h-3 w-3" />
@@ -587,7 +588,6 @@ export default function Compare() {
                   );
                 })}
               </div>
-              {/* 안내 문구: 점수 순에서만 지표 선택 가능 */}
               <p className="text-[11px] text-slate-500">
                 <span
                   className={cn(
@@ -605,29 +605,58 @@ export default function Compare() {
         </CardHeader>
       </Card>
 
-      {/* 모델별 랭킹 카드 리스트 (가로 슬라이드 + 페이지네이션) */}
-      <Card className="overflow-hidden dark:border-white/50">
-        <CardHeader className="space-y-3">
-          {/* 제목 */}
-          <CardTitle className="flex flex-col gap-1 text-sm sm:text-base sm:flex-row sm:items-center sm:justify-between">
-            <span className="flex items-center gap-2">
-              모델 랭킹
-              <span className="text-xs text-slate-400">
-                {TIME_RANGE_LABELS[timeRange]}
-              </span>
-            </span>
+      {/* 모델별 랭킹 카드 리스트 (폭 고정 + 좌우 버튼 페이지 이동) */}
+      <Card className="mt-4 overflow-hidden dark:border-white/50">
+        <CardHeader className="space-y-2 pb-2">
+          <CardTitle className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between sm:text-base">
+            <span className="flex items-center gap-2">모델 랭킹</span>
+
+            {hasData && (
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                {pageCount > 1 && (
+                  <div className="inline-flex items-center gap-1 rounded-full border border-slate-700/80 bg-slate-950/80 px-2.5 py-1.5 shadow-sm shadow-slate-950/60">
+                    <button
+                      type="button"
+                      onClick={() => canPrev && setPage((p) => p - 1)}
+                      disabled={!canPrev}
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-full text-slate-300 transition-all cursor-pointer",
+                        canPrev
+                          ? "hover:bg-violet-500/20 hover:text-violet-100"
+                          : "opacity-40"
+                      )}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="px-1 text-[12px] text-slate-300">
+                      {page + 1} / {pageCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => canNext && setPage((p) => p + 1)}
+                      disabled={!canNext}
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-full text-slate-300 transition-all cursor-pointer",
+                        canNext
+                          ? "hover:bg-violet-500/20 hover:text-violet-100"
+                          : "opacity-40"
+                      )}
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </CardTitle>
         </CardHeader>
 
-        <CardContent className="pb-4">
+        <CardContent className="pt-1">
           {statsLoading ? (
             <div className="w-full max-w-full">
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton
-                    key={i}
-                    className="h-[150px] min-w-[220px] rounded-xl"
-                  />
+              <div className="flex gap-4 pb-2 pt-1">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-[150px] flex-1 rounded-2xl" />
                 ))}
               </div>
             </div>
@@ -638,24 +667,16 @@ export default function Compare() {
               다른 기간이나 정렬 조건으로 다시 시도해보세요.
             </div>
           ) : (
-            <div className="w-full max-w-full" ref={listContainerRef}>
-              {/* 이 섹션 안에서만 가로 스크롤 (뷰포트 전체 X) */}
-              <div
-                className="
-                  flex gap-3 overflow-x-auto pb-3 pt-1
-                  scrollbar-thin scrollbar-thumb-slate-600/60 scrollbar-track-transparent
-                "
-              >
+            <div ref={listContainerRef} className="w-full">
+              <div className="flex gap-4 sm:gap-5">
                 {pagedStats.map((row) => {
                   const globalRank =
                     sortedStats.findIndex((m) => m.modelId === row.modelId) + 1;
 
-                  // 메인 표시 값 계산
                   let primaryValueText = "";
                   let primarySuffix = "";
 
                   if (sortKey === "popular") {
-                    // 인기 순 => 리뷰 수만
                     primaryValueText = row.count.toLocaleString();
                     primarySuffix = "개";
                   } else {
@@ -681,21 +702,22 @@ export default function Compare() {
                       type="button"
                       onClick={() => setSelectedModelId(row.modelId)}
                       className={cn(
-                        "dark:border-white/30 relative flex h-full min-h-[150px] min-w-[230px] max-w-[260px] flex-col justify-between rounded-2xl border border-slate-700/70 bg-slate-950/70 p-3 sm:p-4 text-xs transition-all duration-200 overflow-hidden text-left cursor-pointer",
-                        "shadow-sm shadow-slate-950/60 hover:-translate-y-0.5 hover:border-violet-400/80 hover:shadow-lg hover:shadow-violet-500/40",
+                        // flex-1+min-w-0 → 부모 width 안에서 균등 분배
+                        "relative flex h-full min-h-[150px] min-w-0 flex-1 flex-col justify-between overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/80 p-3.5 text-left text-xs shadow-sm shadow-slate-950/60 transition-all duration-200 sm:p-4",
+                        "hover:-translate-y-0.5 hover:border-violet-400/80 hover:shadow-lg hover:shadow-violet-500/40",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 focus-visible:ring-offset-0",
                         isSelected &&
-                          "ring-2 ring-violet-400/90 ring-offset-0 border-violet-400 bg-slate-950"
+                          "border-violet-400 bg-slate-950 ring-2 ring-violet-400/90 ring-offset-0"
                       )}
                     >
-                      {/* 1줄: 순위 + 아이콘 */}
+                      {/* 1줄: 순위 + 이모지 */}
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           <span className="text-[11px] font-semibold text-slate-100">
                             {globalRank}위
                           </span>
                           {isSelected && (
-                            <span className="ml-1 rounded-full bg-violet-500/25 px-1.5 py-0.5 text-[10px] text-violet-100">
+                            <span className="ml-0.5 rounded-full bg-violet-500/25 px-1.5 py-0.5 text-[10px] text-violet-100">
                               선택됨
                             </span>
                           )}
@@ -708,21 +730,15 @@ export default function Compare() {
                       </div>
 
                       {/* 2줄: 모델 정보 */}
-                      <div className="mt-1 min-h-[1.5rem]">
-                        <ModelInfoRow
-                          meta={row.meta}
-                          compact
-                          // 점수 순 / 이름 순일 때 표본 안 보이게
-                          showCountInline={sortKey === "popular"}
-                          count={row.count}
-                        />
+                      <div className="mt-1.5 min-h-[1.5rem]">
+                        <ModelInfoRow meta={row.meta} compact />
                       </div>
 
                       {/* 3줄: 메인 지표 */}
                       <div className="mt-3 flex items-end justify-between">
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1">
-                            <span className="font-bold tracking-tight tabular-nums text-xl text-violet-500">
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-xl font-bold tracking-tight text-violet-400 tabular-nums">
                               {sortKey === "popular" ? (
                                 <>리뷰 {primaryValueText}</>
                               ) : (
@@ -737,38 +753,10 @@ export default function Compare() {
                           </div>
                         </div>
                       </div>
-
-                      {/* ✅ 유형 고를 때마다 카드 안에 미니 뱃지 추가되는 부분은 삭제함 */}
                     </button>
                   );
                 })}
               </div>
-
-              {/* 페이지네이션 */}
-              {pageCount > 1 && (
-                <div className="mt-3 flex items-center justify-center">
-                  <div className="inline-flex items-center gap-1 rounded-full border border-slate-700/80 bg-slate-950/80 px-1.5 py-1 shadow-sm shadow-slate-950/60 backdrop-blur">
-                    {Array.from({ length: pageCount }, (_, i) => {
-                      const isActive = i === page;
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setPage(i)}
-                          className={cn(
-                            "relative cursor-pointer rounded-full px-3 py-0.5 text-[11px] transition-[background,transform,box-shadow,color,border] duration-150",
-                            isActive
-                              ? "border border-violet-400/80 bg-violet-600 text-white shadow-sm shadow-violet-500/70"
-                              : "border border-transparent text-slate-300 hover:border-violet-400/80 hover:bg-violet-500/10 hover:text-violet-100 hover:-translate-y-0.5"
-                          )}
-                        >
-                          {i + 1}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </CardContent>
@@ -833,7 +821,6 @@ export default function Compare() {
 
             {/* 메트릭 타일 그리드 */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              {/* 총점 */}
               <DetailMetricTile
                 title="총점"
                 icon={Gauge}
@@ -845,8 +832,6 @@ export default function Compare() {
                 suffix="/ 100"
                 accentClass="bg-violet-600/20 text-violet-100"
               />
-
-              {/* Bug */}
               <DetailMetricTile
                 title="Bug"
                 icon={AlertTriangle}
@@ -857,8 +842,6 @@ export default function Compare() {
                 }
                 accentClass="bg-amber-500/15 text-amber-100"
               />
-
-              {/* Maintainability */}
               <DetailMetricTile
                 title="Maintainability"
                 icon={Wrench}
@@ -869,8 +852,6 @@ export default function Compare() {
                 }
                 accentClass="bg-sky-500/15 text-sky-100"
               />
-
-              {/* Style */}
               <DetailMetricTile
                 title="Style"
                 icon={Palette}
@@ -879,10 +860,8 @@ export default function Compare() {
                     ? detailModel.avgByCategory.style.toFixed(1)
                     : "-"
                 }
-                accentClass=" bg-pink-500/15 text-pink-100"
+                accentClass="bg-pink-500/15 text-pink-100"
               />
-
-              {/* Security */}
               <DetailMetricTile
                 title="Security"
                 icon={ShieldCheck}
