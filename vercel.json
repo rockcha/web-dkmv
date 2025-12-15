@@ -1,7 +1,5 @@
 {
   "rewrites": [
-    { "source": "/downloads/(.*)", "destination": "/downloads/$1" },
-    { "source": "/(.*)", "destination": "/index.html" },
     {
       "source": "/api/:path*",
       "destination": "http://18.205.229.159:8000/:path*"
@@ -10,9 +8,9 @@
       "source": "/v1/:path*",
       "destination": "http://18.205.229.159:8000/v1/:path*"
     },
-    {
-      "source": "/((?!.*\\.).*)",
-      "destination": "/index.html"
-    }
+
+    { "source": "/downloads/(.*)", "destination": "/downloads/$1" },
+
+    { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]
 }
