@@ -4,26 +4,14 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code2, Gauge, Monitor } from "lucide-react";
 import { TypingAnimation } from "@/components/ui/typing-animation";
 import DashboardTokenCta from "@/components/DashboardTokenCta";
+import { Highlighter } from "@/components/ui/highlighter"; // ✅ 경로 맞게
 
 const FLOW_STEPS = [
-  {
-    id: 1,
-    label: "바이브 코딩",
-    icon: Code2,
-  },
-  {
-    id: 2,
-    label: "품질 점수화",
-    icon: Gauge,
-  },
-  {
-    id: 3,
-    label: "웹에서 확인",
-    icon: Monitor,
-  },
+  { id: 1, label: "바이브 코딩", icon: Code2 },
+  { id: 2, label: "품질 점수화", icon: Gauge },
+  { id: 3, label: "웹에서 확인", icon: Monitor },
 ];
 
-// 보라색 하이라이트 칩 공통 클래스
 const VIOLET_CHIP_CLASS =
   "rounded-md bg-violet-500/5 px-1.5 py-0.5 " +
   "text-violet-700 dark:text-violet-300";
@@ -36,6 +24,11 @@ export default function Landing() {
 
   // 🔄 플로우 카드 뒤 보라색 글로우 순환 인덱스
   const [activeFlowGlow, setActiveFlowGlow] = useState(0);
+
+  // ✅ 하이라이트 시퀀스: 0(없음) → 1(box) → 2(circle) → 3(underline) → 0 반복
+  const [hlPhase, setHlPhase] = useState<0 | 1 | 2 | 3>(0);
+  // ✅ rough-notation은 "다시 그리기"가 필요해서 cycle로 remount 시킴
+  const [hlCycle, setHlCycle] = useState(0);
 
   useEffect(() => {
     const timer = setTimeout(() => setHasLoaded(true), 50);
@@ -51,13 +44,67 @@ export default function Landing() {
     return () => clearInterval(interval);
   }, []);
 
-  // 🔁 플로우 카드 보라색 글로우 순차 순환 (조금 더 오래 & 부드럽게)
+  // 🔁 플로우 카드 보라색 글로우 순차 순환
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveFlowGlow((prev) => (prev + 1) % FLOW_STEPS.length);
-    }, 2600); // 카드 하나당 2.6초 정도로 조금 더 길게
+    }, 2600);
     return () => clearInterval(interval);
   }, []);
+
+  // ✅ DKMV 타이틀 하이라이트 반복 시퀀스
+  useEffect(() => {
+    if (!hasLoaded) return;
+
+    let alive = true;
+    let t1: number | undefined;
+    let t2: number | undefined;
+    let t3: number | undefined;
+    let t4: number | undefined;
+
+    // 각 단계 시간(원하면 여기만 조절)
+    const d1 = 700; // box 그리는 시간/대기
+    const d2 = 700; // circle
+    const d3 = 650; // underline
+    const gap = 450; // 한 사이클 끝나고 쉬는 시간
+
+    const run = () => {
+      if (!alive) return;
+
+      setHlPhase(1); // box ON
+      t1 = window.setTimeout(() => {
+        if (!alive) return;
+        setHlPhase(2); // circle ON
+      }, d1);
+
+      t2 = window.setTimeout(() => {
+        if (!alive) return;
+        setHlPhase(3); // underline ON
+      }, d1 + d2);
+
+      t3 = window.setTimeout(() => {
+        if (!alive) return;
+        // 다 끝나면 꺼졌다가 cycle 증가로 다시 "그리기"
+        setHlPhase(0);
+        setHlCycle((c) => c + 1);
+      }, d1 + d2 + d3);
+
+      t4 = window.setTimeout(() => {
+        if (!alive) return;
+        run(); // 반복
+      }, d1 + d2 + d3 + gap);
+    };
+
+    run();
+
+    return () => {
+      alive = false;
+      if (t1) window.clearTimeout(t1);
+      if (t2) window.clearTimeout(t2);
+      if (t3) window.clearTimeout(t3);
+      if (t4) window.clearTimeout(t4);
+    };
+  }, [hasLoaded]);
 
   const fadeClass = hasLoaded
     ? "opacity-100 translate-y-0"
@@ -68,22 +115,14 @@ export default function Landing() {
 
   return (
     <>
-      {/* 좌우 분할 보라색 애니메이션 라인 (헤더/푸터 스타일과 유사) */}
       <style>{`
         @keyframes dkmvBorderSweep {
-          0% {
-            background-position: 0% 0%;
-          }
-          50% {
-            background-position: 0% 100%;
-          }
-          100% {
-            background-position: 0% 0%;
-          }
+          0% { background-position: 0% 0%; }
+          50% { background-position: 0% 100%; }
+          100% { background-position: 0% 0%; }
         }
       `}</style>
 
-      {/* 🔹 AppLayout에서 main row 전체 높이를 채우도록 h-full */}
       <div
         className="
           flex h-full flex-col
@@ -91,7 +130,6 @@ export default function Landing() {
           dark:bg-slate-950 dark:text-slate-100
         "
       >
-        {/* 메인 컨텐츠: main 기준 좌/우 분할 */}
         <div
           className="
             relative flex flex-1 flex-col lg:flex-row
@@ -101,13 +139,12 @@ export default function Landing() {
             dark:from-slate-950 dark:via-slate-950 dark:to-slate-900
           "
         >
-          {/* 은은한 배경 그라디언트 원 */}
           <div className="pointer-events-none absolute inset-0 -z-10 opacity-60">
             <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full blur-3xl bg-violet-300/40 dark:bg-violet-500/25" />
             <div className="absolute -bottom-20 -right-20 h-72 w-72 rounded-full blur-3xl bg-cyan-300/40 dark:bg-cyan-500/20" />
           </div>
 
-          {/* ====== 왼쪽 컬럼: 기존 Hero UI 유지 ====== */}
+          {/* ====== 왼쪽 ====== */}
           <section
             className={`
               flex-1 flex items-center
@@ -118,7 +155,6 @@ export default function Landing() {
           >
             <div className="mx-auto w-full max-w-3xl flex flex-col items-center">
               <div className="max-w-xl text-center">
-                {/* 제목 + 로고 + Beta 뱃지 */}
                 <h1
                   className="
                     mt-4 inline-flex items-center justify-center gap-3 sm:gap-4
@@ -127,7 +163,45 @@ export default function Landing() {
                   "
                 >
                   <span className="flex items-center gap-3">
-                    Don’t Kill My Vibe
+                    {/* ✅ 반복 시퀀스: enabled로 단계별 on/off + cycle로 다시 그리기 */}
+                    <Highlighter
+                      key={`box-${hlCycle}`}
+                      action="box"
+                      color="rgba(139,92,246,0.75)"
+                      strokeWidth={2}
+                      padding={6}
+                      animationDuration={650}
+                      iterations={1}
+                      enabled={hlPhase >= 1}
+                      isView={false}
+                    >
+                      <Highlighter
+                        key={`circle-${hlCycle}`}
+                        action="circle"
+                        color="rgba(34,211,238,0.75)"
+                        strokeWidth={2}
+                        padding={8}
+                        animationDuration={1250}
+                        iterations={1}
+                        enabled={hlPhase >= 2}
+                        isView={false}
+                      >
+                        <Highlighter
+                          key={`underline-${hlCycle}`}
+                          action="underline"
+                          color="rgba(139,92,246,0.85)"
+                          strokeWidth={2.2}
+                          padding={2}
+                          animationDuration={1200}
+                          iterations={1}
+                          enabled={hlPhase >= 3}
+                          isView={false}
+                        >
+                          Don’t Kill My Vibe
+                        </Highlighter>
+                      </Highlighter>
+                    </Highlighter>
+
                     <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/50 bg-violet-500/10 px-2 py-0.5 text-[0.65rem] font-semibold text-violet-700 dark:text-violet-200">
                       Beta
                       <span className="relative flex h-1.5 w-1.5">
@@ -138,7 +212,6 @@ export default function Landing() {
                   </span>
                 </h1>
 
-                {/* 서브카피 + 키워드 하이라이트 */}
                 <p className="mt-5 text-sm sm:text-base text-slate-600 dark:text-slate-300">
                   <span className="font-medium">AI가 만들어낸 코드</span>를{" "}
                   <span className={VIOLET_CHIP_CLASS}>
@@ -150,7 +223,6 @@ export default function Landing() {
                   에서 한 번에 관리할 수 있는 코드 품질 시스템입니다.
                 </p>
 
-                {/* 플로우 카드 */}
                 <div
                   className={`
                     mt-10 transform-gpu transition-all duration-700 ease
@@ -164,7 +236,6 @@ export default function Landing() {
                       const isActiveGlow = activeFlowGlow === idx;
                       return (
                         <div key={step.id} className="relative">
-                          {/* 🔮 보라색 글로우 배경 (순차적으로 켜짐 - 유지시간 길고 부드러운 페이드) */}
                           <div
                             className={`
                               pointer-events-none absolute -inset-1
@@ -213,7 +284,6 @@ export default function Landing() {
                                 </div>
                               </div>
 
-                              {/* 스텝별 짧은 설명 */}
                               <p className="mt-1 text-[0.7rem] leading-relaxed text-slate-500 dark:text-slate-200">
                                 {idx === 0 &&
                                   "VSCode에서 평소처럼 코딩하는 순간, 바이브를 그대로 캡처합니다."}
@@ -230,7 +300,6 @@ export default function Landing() {
                   </div>
                 </div>
 
-                {/* CTA: 타이핑 + 대시보드/토큰 페어 컴포넌트 */}
                 <div
                   className={`
                     mt-10 transform-gpu transition-all duration-700 ease-out
@@ -257,7 +326,7 @@ export default function Landing() {
             </div>
           </section>
 
-          {/* ====== 오른쪽 컬럼: main 기준 오른쪽 절반 전체를 비디오가 차지 ====== */}
+          {/* ====== 오른쪽 ====== */}
           <aside
             className="
               flex-1 relative
@@ -266,7 +335,6 @@ export default function Landing() {
               min-h-[260px]
             "
           >
-            {/* 좌우 분할 보라색 애니메이션 라인 (lg 이상에서만 표시) */}
             <div className="pointer-events-none absolute inset-y-0 -left-[1px] z-20 hidden lg:block">
               <div
                 className="h-full w-[2px] rounded-full"
@@ -279,7 +347,6 @@ export default function Landing() {
               />
             </div>
 
-            {/* 비디오 상단 라벨 */}
             <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-lg bg-black/65 px-3 py-1 text-[0.7rem] font-medium text-slate-100">
               <Monitor className="size-3.5" />
               {isExtensionMode
@@ -287,7 +354,6 @@ export default function Landing() {
                 : "DKMV Idle 화면"}
             </div>
 
-            {/* Idle 비디오 */}
             <video
               className={`
                 absolute inset-0 h-full w-full object-cover
@@ -303,7 +369,6 @@ export default function Landing() {
               브라우저에서 HTML5 비디오를 지원하지 않습니다.
             </video>
 
-            {/* VSCode 익스텐션 비디오 */}
             <video
               className={`
                 absolute inset-0 h-full w-full object-cover
@@ -319,7 +384,6 @@ export default function Landing() {
               브라우저에서 HTML5 비디오를 지원하지 않습니다.
             </video>
 
-            {/* 하단 설명 그라디언트 오버레이 */}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-4 py-4">
               <p className="text-xs sm:text-sm text-slate-100">
                 {isExtensionMode ? (

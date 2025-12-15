@@ -28,17 +28,39 @@ type NavItem = {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
 
-/** ===== 네비게이션 아이템 목록 ===== */
-const NAV_ITEMS: NavItem[] = [
-  { to: "/mypage/dashboard", label: "대시보드", icon: LayoutDashboard },
-  { to: "/mypage/analyses", label: "분석 내역", icon: ListChecks },
-  { to: "/mypage/compare", label: "모델 비교", icon: GitCompare },
+/** ===== 네비 섹션 타입 ===== */
+type NavSection = {
+  title: string;
+  items: NavItem[];
+};
 
-  { to: "/mypage/leaderboard", label: "랭킹", icon: Trophy },
-  { to: "/mypage/playground", label: "플레이그라운드", icon: FlaskConical },
-
-  { to: "/mypage/settings", label: "설정", icon: SettingsIcon },
+/** ===== 네비 섹션 구성 ===== */
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: "🧠 내 바이브",
+    items: [
+      { to: "/mypage/dashboard", label: "대시보드", icon: LayoutDashboard },
+      { to: "/mypage/analyses", label: "분석 내역", icon: ListChecks },
+      { to: "/mypage/settings", label: "설정", icon: SettingsIcon },
+    ],
+  },
+  {
+    title: "🌍 글로벌 바이브",
+    items: [
+      { to: "/mypage/compare", label: "모델 비교", icon: GitCompare },
+      { to: "/mypage/leaderboard", label: "랭킹", icon: Trophy },
+    ],
+  },
+  {
+    title: "🎸 기타",
+    items: [
+      { to: "/mypage/playground", label: "플레이그라운드", icon: FlaskConical },
+    ],
+  },
 ];
+
+/** PageHeader 계산용: 섹션을 펼쳐서 flat array로 */
+const NAV_ITEMS_FLAT: NavItem[] = NAV_SECTIONS.flatMap((s) => s.items);
 
 export default function AppLayout() {
   const { pathname } = useLocation();
@@ -127,13 +149,7 @@ export default function AppLayout() {
               >
                 <ScrollArea className="h-full">
                   {/* 상단: 제목 + 접기/펼치기 버튼 */}
-                  <div className="flex items-center justify-between px-3 pt-4 pb-2">
-                    {!isSidebarCollapsed && (
-                      <span className="px-1 text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        메뉴
-                      </span>
-                    )}
-
+                  <div className="flex items-center justify-end px-3 pt-4 pb-2">
                     <button
                       type="button"
                       onClick={() => setIsSidebarCollapsed((prev) => !prev)}
@@ -155,170 +171,180 @@ export default function AppLayout() {
                   </div>
 
                   <nav className="px-2 pb-5" aria-label="주 메뉴">
-                    <ul className="space-y-1.5">
-                      {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-                        <li key={to}>
-                          <NavLink
-                            to={to}
-                            className={({
-                              isActive,
-                            }: {
-                              isActive: boolean;
-                            }) => {
-                              const base =
-                                "group relative flex items-center rounded-lg border border-transparent px-3 py-3 text-[15px] md:text-base transition-all transform";
-                              const layout = isSidebarCollapsed
-                                ? "justify-center"
-                                : "gap-3.5";
-
-                              // 펼쳐진 상태에서의 hover
-                              const hoverExpanded = isActive
-                                ? ""
-                                : `
-                                  hover:bg-violet-50/90
-                                  hover:text-violet-900
-                                  hover:translate-x-1
-                                  dark:hover:bg-violet-900/70
-                                  dark:hover:text-violet-100
-                                  hover:border-violet-200
-                                  dark:hover:border-violet-500
-                                  hover:shadow-sm
-                                `;
-
-                              // 접힌 상태에서는 배경/이동 없이 심플하게
-                              const hoverCollapsed = isActive
-                                ? ""
-                                : "hover:bg-transparent";
-
-                              const activeBase = isActive
-                                ? `
-                                    font-semibold text-white
-                                    bg-violet-500 dark:bg-violet-500
-                                    border-violet-500 shadow-sm shadow-violet-500/30
-                                    translate-x-0.5
-                                  `
-                                : "text-slate-600 dark:text-slate-300";
-
-                              return [
-                                base,
-                                layout,
-                                isSidebarCollapsed
-                                  ? hoverCollapsed
-                                  : hoverExpanded,
-                                activeBase,
-                              ].join(" ");
-                            }}
-                          >
-                            {/* 왼쪽 보라 인디케이터 바 (펼쳐진 상태에서만) */}
-                            {!isSidebarCollapsed && (
-                              <span
-                                className="
-                                  pointer-events-none
-                                  absolute left-1 top-1/2 -translate-y-1/2
-                                  h-7 w-[3px]
-                                  rounded-full bg-violet-500
-                                  origin-center
-                                  scale-y-0 opacity-0
-                                  transition-transform duration-300
-                                  group-hover:scale-y-100
-                                  group-hover:opacity-100
-                                "
-                              />
-                            )}
-
-                            {/* 아이콘 + 글로우 래퍼 */}
-                            <span className="relative flex items-center justify-center">
-                              {/* 아이콘 뒤 글로우 */}
-                              <span
-                                className={`
-                                  absolute inset-0
-                                  rounded-full
-                                  bg-violet-500/8 dark:bg-violet-400/15
-                                  blur-sm
-                                  opacity-0
-                                  transition-opacity duration-200
-                                  ${isSidebarCollapsed ? "w-7 h-7" : "w-7 h-7"}
-                                  group-hover:opacity-100
-                                `}
-                              />
-                              <Icon
-                                className={`
-                                  relative z-10 size-5
-                                  transition-all duration-200 ease-out
-                                  ${
-                                    isSidebarCollapsed
-                                      ? "group-hover:scale-125 group-hover:-translate-y-0.5"
-                                      : "group-hover:animate-wiggle-rotate group-hover:text-violet-600 dark:group-hover:text-violet-300"
-                                  }
-                                `}
-                              />
-                            </span>
-
-                            {/* 라벨 + 밑줄 */}
-                            <span
-                              className={`
-                                relative flex items-center truncate transition-all duration-300
-                                ${
-                                  isSidebarCollapsed
-                                    ? "max-w-0 opacity-0 ml-0"
-                                    : "max-w-[160px] opacity-100 ml-3"
-                                }
-                              `}
-                            >
-                              {/* 텍스트 */}
-                              <span className="whitespace-nowrap">{label}</span>
-
-                              {/* 보라 밑줄: 펼쳐져 있을 때만 슬라이드 인 */}
-                              {!isSidebarCollapsed && (
-                                <span
-                                  className="
-                                    pointer-events-none
-                                    absolute -bottom-0.5 left-0
-                                    h-[2px] w-full
-                                    rounded-full bg-violet-500
-                                    transform origin-left
-                                    scale-x-0 -translate-x-2
-                                    opacity-0
-                                    transition-all duration-300 ease-out
-                                    group-hover:scale-x-100
-                                    group-hover:translate-x-0
-                                    group-hover:opacity-100
-                                  "
-                                />
-                              )}
-                            </span>
-
-                            {/* 접힌 상태에서 툴팁 */}
-                            {isSidebarCollapsed && (
-                              <span
-                                className="
-                                  pointer-events-none
-                                  absolute left-full ml-2
-                                  rounded-lg bg-slate-900/90 text-xs text-slate-50
-                                  px-2 py-1
-                                  opacity-0 translate-x-2
-                                  group-hover:opacity-100
-                                  group-hover:translate-x-0
-                                  shadow-lg
-                                  whitespace-nowrap
-                                  z-50
-                                "
-                              >
-                                {label}
+                    <ul className="space-y-4">
+                      {NAV_SECTIONS.map((section, sIdx) => (
+                        <li key={section.title}>
+                          {/* 섹션 타이틀 */}
+                          {!isSidebarCollapsed && (
+                            <div className="px-2 ">
+                              <span className="text-[12px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                {section.title}
                               </span>
-                            )}
-                          </NavLink>
+                            </div>
+                          )}
+
+                          {/* 섹션 아이템 */}
+                          <ul className="space-y-1.5">
+                            {section.items.map(({ to, label, icon: Icon }) => (
+                              <li key={to}>
+                                <NavLink
+                                  to={to}
+                                  className={({
+                                    isActive,
+                                  }: {
+                                    isActive: boolean;
+                                  }) => {
+                                    const base =
+                                      "group relative flex items-center rounded-lg border border-transparent px-3 py-3 text-[15px] md:text-base transition-all transform";
+                                    const layout = isSidebarCollapsed
+                                      ? "justify-center"
+                                      : "gap-3.5";
+
+                                    const hoverExpanded = isActive
+                                      ? ""
+                                      : `
+                                          hover:bg-violet-50/90
+                                          hover:text-violet-900
+                                    
+                                          dark:hover:bg-violet-900/70
+                                          dark:hover:text-violet-100
+                                          hover:border-violet-200
+                                          dark:hover:border-violet-500
+                                          hover:shadow-sm
+                                        `;
+
+                                    const hoverCollapsed = isActive
+                                      ? ""
+                                      : "hover:bg-transparent";
+
+                                    const activeBase = isActive
+                                      ? `
+                                          font-semibold text-white
+                                          bg-violet-500 dark:bg-violet-500
+                                          border-violet-500 shadow-sm shadow-violet-500/30
+                                          translate-x-0.5
+                                        `
+                                      : "text-slate-600 dark:text-slate-300";
+
+                                    return [
+                                      base,
+                                      layout,
+                                      isSidebarCollapsed
+                                        ? hoverCollapsed
+                                        : hoverExpanded,
+                                      activeBase,
+                                    ].join(" ");
+                                  }}
+                                >
+                                  {/* 왼쪽 보라 인디케이터 바 (펼쳐진 상태에서만) */}
+                                  {!isSidebarCollapsed && (
+                                    <span
+                                      className="
+                                        pointer-events-none
+                                        absolute left-1 top-1/2 -translate-y-1/2
+                                        h-7 w-[3px]
+                                        rounded-full bg-violet-500
+                                        origin-center
+                                        scale-y-0 opacity-0
+                                        transition-transform duration-300
+                                        group-hover:scale-y-100
+                                        group-hover:opacity-100
+                                      "
+                                    />
+                                  )}
+
+                                  {/* 아이콘 + 글로우 래퍼 */}
+                                  <span className="relative flex items-center justify-center">
+                                    <span
+                                      className="
+                                        absolute inset-0
+                                        rounded-full
+                                        bg-violet-500/8 dark:bg-violet-400/15
+                                        blur-sm
+                                        opacity-0
+                                        transition-opacity duration-200
+                                        w-7 h-7
+                                        group-hover:opacity-100
+                                      "
+                                    />
+                                    <Icon
+                                      className={`
+                                        relative z-10 size-5
+                                        transition-all duration-200 ease-out
+                                        ${
+                                          isSidebarCollapsed
+                                            ? "group-hover:scale-125 group-hover:-translate-y-0.5"
+                                            : "group-hover:animate-wiggle-rotate group-hover:text-violet-600 dark:group-hover:text-violet-300"
+                                        }
+                                      `}
+                                    />
+                                  </span>
+
+                                  {/* 라벨 + 밑줄 */}
+                                  <span
+                                    className={`
+                                      relative flex items-center truncate transition-all duration-300
+                                      ${
+                                        isSidebarCollapsed
+                                          ? "max-w-0 opacity-0 ml-0"
+                                          : "max-w-[160px] opacity-100 ml-3"
+                                      }
+                                    `}
+                                  >
+                                    <span className="whitespace-nowrap">
+                                      {label}
+                                    </span>
+
+                                    {!isSidebarCollapsed && (
+                                      <span
+                                        className="
+                                          pointer-events-none
+                                          absolute -bottom-0.5 left-0
+                                          h-[2px] w-full
+                                          rounded-full bg-violet-500
+                                          transform origin-left
+                                          scale-x-0 -translate-x-2
+                                          opacity-0
+                                          transition-all duration-300 ease-out
+                                          group-hover:scale-x-100
+                                          group-hover:translate-x-0
+                                          group-hover:opacity-100
+                                        "
+                                      />
+                                    )}
+                                  </span>
+
+                                  {/* 접힌 상태에서 툴팁 */}
+                                  {isSidebarCollapsed && (
+                                    <span
+                                      className="
+                                        pointer-events-none
+                                        absolute left-full ml-2
+                                        rounded-lg bg-slate-900/90 text-xs text-slate-50
+                                        px-2 py-1
+                                        opacity-0 translate-x-2
+                                        group-hover:opacity-100
+                                        group-hover:translate-x-0
+                                        shadow-lg
+                                        whitespace-nowrap
+                                        z-50
+                                      "
+                                    >
+                                      {label}
+                                    </span>
+                                  )}
+                                </NavLink>
+                              </li>
+                            ))}
+                          </ul>
+
+                          {/* 섹션 사이 구분선 (마지막 섹션 제외) */}
+                          {sIdx !== NAV_SECTIONS.length - 1 && (
+                            <Separator className="my-4 bg-slate-200 dark:bg-slate-800" />
+                          )}
                         </li>
                       ))}
                     </ul>
-
-                    <Separator className="my-5 bg-slate-200 dark:bg-slate-800" />
-
-                    {!isSidebarCollapsed && (
-                      <p className="px-3 pt-1 text-[12px] text-slate-500 dark:text-slate-400">
-                        Don’t Kill My Vibe
-                      </p>
-                    )}
                   </nav>
                 </ScrollArea>
               </aside>
@@ -359,8 +385,8 @@ export default function AppLayout() {
 /** 현재 페이지 타이틀/아이콘 계산 + 렌더 분리 */
 function PageHeader({ pathname }: { pathname: string }) {
   const current =
-    NAV_ITEMS.find((n) => pathname === n.to) ??
-    NAV_ITEMS.find((n) => pathname.startsWith(n.to));
+    NAV_ITEMS_FLAT.find((n) => pathname === n.to) ??
+    NAV_ITEMS_FLAT.find((n) => pathname.startsWith(n.to));
 
   const CurrentIcon = current?.icon ?? LayoutDashboard;
 
