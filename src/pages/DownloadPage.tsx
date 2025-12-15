@@ -1,5 +1,5 @@
 // src/pages/DownloadPage.tsx
-import React from "react";
+
 import {
   DownloadCloud,
   ExternalLink,

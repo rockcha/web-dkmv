@@ -464,10 +464,10 @@ export default function Compare() {
         />
 
         <CardContent className="pt-4">
-          {/* ✅ 카드 내부 좌/우 분할: (좌) 기간/정렬, (우) 지표 버튼+힌트 */}
-          <div className="grid gap-4 md:grid-cols-[1fr,1.15fr]">
+          {/* ✅ flex 좌우 배치 */}
+          <div className="flex flex-col gap-4 md:flex-row">
             {/* 좌측: 기간 & 정렬 */}
-            <div className="rounded-2xl border border-slate-200/70 bg-white/60 p-3 backdrop-blur dark:border-white/10 dark:bg-slate-950/35">
+            <div className="flex-1 rounded-2xl border border-slate-200/70 bg-white/60 p-3 backdrop-blur dark:border-white/10 dark:bg-slate-950/35">
               <div className="mb-2 text-[11px] font-semibold text-slate-700 dark:text-white/80">
                 필터
               </div>
@@ -528,27 +528,11 @@ export default function Compare() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* 현재 상태 요약 */}
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="rounded-full border-purple-400/40 bg-purple-500/10 text-purple-700 dark:bg-purple-500/15 dark:text-purple-100"
-                  >
-                    {TIME_RANGE_LABELS[timeRange]}
-                  </Badge>
-                  <Badge
-                    variant="outline"
-                    className="rounded-full border-slate-300/70 bg-slate-100/70 text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-white/80"
-                  >
-                    {SORT_LABELS[sortKey]}
-                  </Badge>
-                </div>
               </div>
             </div>
 
             {/* 우측: 지표 멀티 선택 + 힌트 */}
-            <div className="rounded-2xl border border-slate-200/70 bg-white/60 p-3 backdrop-blur dark:border-white/10 dark:bg-slate-950/35">
+            <div className="flex-[1.15] rounded-2xl border border-slate-200/70 bg-white/60 p-3 backdrop-blur dark:border-white/10 dark:bg-slate-950/35">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="text-[11px] font-semibold text-slate-700 dark:text-white/80">
                   비교 지표
@@ -606,7 +590,7 @@ export default function Compare() {
                   })}
                 </div>
 
-                {/* ✅ 힌트 줄: 우측 블록 하단에 자연스럽게 */}
+                {/* 힌트 */}
                 <div className="mt-1 rounded-xl border border-slate-200/60 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-white/70">
                   <span
                     className={cn(
@@ -633,9 +617,9 @@ export default function Compare() {
           icon={Bot}
           title="모델 랭킹"
           subtitle="상단 카드에서 모델을 선택하면 아래 상세 보기가 함께 변경됩니다."
-          // ✅ 요청: '이번주, 점수 순' 같은 뱃지를 랭킹 섹션 오른쪽 상단으로 이동 + 가시적으로
           right={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {/* 기간 */}
               <Badge
                 variant="outline"
                 className="rounded-full border-purple-400/40 bg-purple-500/10 text-purple-700 dark:bg-purple-500/15 dark:text-purple-100"
@@ -643,6 +627,8 @@ export default function Compare() {
                 <Calendar className="mr-1 h-3.5 w-3.5" />
                 {TIME_RANGE_LABELS[timeRange]}
               </Badge>
+
+              {/* 정렬 */}
               <Badge
                 variant="outline"
                 className={cn(
@@ -654,6 +640,47 @@ export default function Compare() {
                 <ArrowUpDown className="mr-1 h-3.5 w-3.5" />
                 {SORT_LABELS[sortKey]}
               </Badge>
+
+              {/* ✅ 선택 기준(유형) 가시화 */}
+              <div className="hidden sm:flex items-center gap-1.5">
+                {sortKey === "popular" && (
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-slate-300/70 bg-slate-100/60 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-white/70"
+                  >
+                    <Trophy className="mr-1 h-3.5 w-3.5" />
+                    리뷰 수 기준
+                  </Badge>
+                )}
+
+                {sortKey === "alpha" && (
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border-slate-300/70 bg-slate-100/60 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-white/70"
+                  >
+                    <Bot className="mr-1 h-3.5 w-3.5" />
+                    이름 정렬
+                  </Badge>
+                )}
+
+                {sortKey === "score" && (
+                  <>
+                    {selectedMetrics.map((k) => {
+                      const Icon = METRIC_CONFIG[k].icon;
+                      return (
+                        <Badge
+                          key={k}
+                          variant="outline"
+                          className="rounded-full border-purple-400/30 bg-purple-500/10 text-purple-700 dark:border-purple-300/25 dark:bg-purple-500/15 dark:text-purple-100"
+                        >
+                          <Icon className="mr-1 h-3.5 w-3.5" />
+                          {METRIC_CONFIG[k].shortLabel}
+                        </Badge>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
             </div>
           }
         />
@@ -745,7 +772,7 @@ export default function Compare() {
 
                     {/* 2줄: 모델 정보 */}
                     <div className="mt-1.5 min-h-[1.5rem]">
-                      <div className="flex min-w-0 flex-col items-center gap-1.5">
+                      <div className="flex w-full min-w-0 flex-col items-center gap-1.5">
                         <Badge
                           variant="outline"
                           className={cn(
@@ -755,16 +782,25 @@ export default function Compare() {
                         >
                           {row.meta.provider}
                         </Badge>
-                        <span
-                          className={cn(
-                            "truncate text-xs font-semibold",
-                            "text-slate-900 dark:text-slate-100"
-                          )}
-                        >
-                          {row.meta.label ||
+
+                        {(() => {
+                          const name =
+                            row.meta.label ||
                             row.modelId.replace(`${row.meta.provider}/`, "") ||
-                            row.modelId}
-                        </span>
+                            row.modelId;
+
+                          return (
+                            <span
+                              title={name}
+                              className={cn(
+                                "w-full min-w-0 max-w-[160px] truncate text-center text-xs font-semibold",
+                                "text-slate-900 dark:text-slate-100"
+                              )}
+                            >
+                              {name}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -838,7 +874,17 @@ export default function Compare() {
                   >
                     {detailModel.meta.provider}
                   </Badge>
-                  <span className="max-w-[260px] truncate text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  <span
+                    className="max-w-[260px] truncate text-xs font-semibold text-slate-900 dark:text-slate-100"
+                    title={
+                      detailModel.meta.label ||
+                      detailModel.modelId.replace(
+                        `${detailModel.meta.provider}/`,
+                        ""
+                      ) ||
+                      detailModel.modelId
+                    }
+                  >
                     {detailModel.meta.label ||
                       detailModel.modelId.replace(
                         `${detailModel.meta.provider}/`,

@@ -32,15 +32,13 @@ import {
   Gauge,
   Trophy,
   Clock,
-  LayoutGrid,
   X,
+  Sparkles,
 } from "lucide-react";
 
 /* ===========================================================
-   🔹 타입 / 뷰 모드
+   🔹 타입
 =========================================================== */
-
-type ViewMode = "detailed" | "compact";
 
 /* ===========================================================
    🔹 카테고리 설정
@@ -68,14 +66,12 @@ const CATEGORY_ICONS: Record<CategoryKey, React.ComponentType<any>> = {
 };
 
 /* ===========================================================
-   🔹 공통 Brand Header (Dashboard 링+글로우 스타일로 통일)
+   🔹 공통 Brand Header
 =========================================================== */
 
-// ✅ 헤더: 배경 단색/그라데이션 제거, 텍스트/아이콘만 강조
 const brandHeader =
   "relative px-5 pt-5 pb-4 border-b border-slate-200/70 dark:border-white/10";
 
-// ✅ 아이콘 링 + 은은 글로우 (Dashboard와 동일 톤)
 const iconWrap =
   "relative grid place-items-center h-11 w-11 rounded-2xl " +
   "ring-1 ring-purple-500/25 dark:ring-purple-300/25 " +
@@ -84,7 +80,6 @@ const iconWrap =
 
 const iconGlyph = "h-6 w-6 text-purple-700 dark:text-purple-200";
 
-// ✅ 핵심지표 카드(4개) 스타일 통일용
 const statCard =
   "flex flex-col gap-3 rounded-xl border bg-background/60 p-3 " +
   "border-purple-500/15 dark:border-purple-300/15 " +
@@ -168,14 +163,13 @@ function formatAudit(audit: string) {
   return `${date} · ${time}`;
 }
 
-/* 작은 구분선 */
 function SectionDivider() {
   return (
     <div className="my-3 h-px bg-slate-200 dark:bg-slate-700/80" aria-hidden />
   );
 }
 
-/* 카테고리 섹션 공통 뷰 */
+/* 카테고리 섹션 */
 function CategorySection({ item }: { item: ReviewItem }) {
   return (
     <div>
@@ -194,7 +188,12 @@ function CategorySection({ item }: { item: ReviewItem }) {
           return (
             <div
               key={key}
-              className="rounded-lg bg-background/80 px-3 py-2 text-[11px] shadow-[0_0_0_1px_rgba(148,163,184,0.35)] dark:shadow-[0_0_0_1px_rgba(148,163,184,0.45)]"
+              className={cn(
+                "rounded-lg bg-background/80 px-3 py-2 text-[11px]",
+                "shadow-[0_0_0_1px_rgba(148,163,184,0.35)] dark:shadow-[0_0_0_1px_rgba(148,163,184,0.45)]",
+                "hover:shadow-[0_0_0_1px_rgba(139,92,246,0.28)] dark:hover:shadow-[0_0_0_1px_rgba(196,181,253,0.28)]",
+                "transition"
+              )}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -230,7 +229,7 @@ function CategorySection({ item }: { item: ReviewItem }) {
 }
 
 /* ===========================================================
-   🔹 Detail Dialog (클릭 안먹힘/모션 튐 해결 + 보라 테두리)
+   🔹 Detail Dialog (보라 테두리/글로우 강화 + 프레임 예쁘게)
 =========================================================== */
 
 function ReviewDetailDialog({
@@ -250,28 +249,31 @@ function ReviewDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        {/* ✅ Overlay: z-50 */}
+        {/* Overlay */}
         <DialogPrimitive.Overlay
           className={cn(
-            "fixed inset-0 z-50 bg-black/80 backdrop-blur-md",
+            "fixed inset-0 z-50 bg-black/85 backdrop-blur-lg",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
             "duration-200"
           )}
         />
 
-        {/* ✅ Content: overlay보다 위(z-[60]) + pointer-events 보장
-            ✅ 모션: slide-left 제거(튐 방지), fade+zoom+top 살짝
-            ✅ 테두리: 은은 보라
-        */}
         <DialogPrimitive.Content
           className={cn(
             "fixed left-1/2 top-1/2 z-[60] w-[96vw] max-w-5xl -translate-x-1/2 -translate-y-1/2",
             "pointer-events-auto",
-            "rounded-2xl bg-background",
-            "border border-purple-500/20 dark:border-purple-300/20",
-            "shadow-[0_20px_60px_rgba(0,0,0,0.55),0_0_0_1px_rgba(139,92,246,0.18)]",
+            "rounded-3xl bg-background",
+            // ✅ 프레임: 보라 링 + 소프트 글로우 강화
+            "border border-purple-500/35 dark:border-purple-300/30",
+            "shadow-[0_28px_90px_rgba(0,0,0,0.65)]",
+            "ring-1 ring-purple-500/25 dark:ring-purple-300/20",
+            // ✅ 바깥 글로우(보라) — 튀지 않게 다층
+            "before:pointer-events-none before:content-[''] before:absolute before:inset-0 before:rounded-3xl",
+            "before:shadow-[0_0_0_2px_rgba(139,92,246,0.20),0_0_40px_rgba(139,92,246,0.22)]",
+            "dark:before:shadow-[0_0_0_2px_rgba(196,181,253,0.16),0_0_44px_rgba(196,181,253,0.20)]",
             "focus-visible:outline-none",
+            // Motion
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
             "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
@@ -279,25 +281,46 @@ function ReviewDetailDialog({
             "duration-200"
           )}
         >
-          {/* ✅ Close: z 더 높게 + cursor-pointer 확실히 */}
+          {/* Close */}
           <DialogPrimitive.Close
             className={cn(
               "absolute right-4 top-4 z-[70]",
-              "inline-flex h-9 w-9 items-center justify-center rounded-full",
-              "bg-white/70 hover:bg-white",
+              "inline-flex h-10 w-10 items-center justify-center rounded-full",
+              "bg-white/80 hover:bg-white",
               "dark:bg-white/10 dark:hover:bg-white/15",
               "ring-1 ring-slate-200/70 dark:ring-white/10",
-              "transition cursor-pointer pointer-events-auto"
+              "transition cursor-pointer pointer-events-auto",
+              // ✅ close도 은은한 보라 포커스
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/70"
             )}
             aria-label="Close"
           >
             <X className="h-4 w-4 text-slate-700 dark:text-white/80 cursor-pointer" />
           </DialogPrimitive.Close>
 
-          <div className={cn(brandHeader, "px-6 pt-6 pb-5")}>
-            <div className="flex items-start justify-between gap-3">
+          {/* 헤더: 살짝 그라데이션 + 상단 하이라이트 */}
+          <div
+            className={cn(
+              "relative px-6 pt-6 pb-5 border-b",
+              "border-purple-500/20 dark:border-purple-300/15",
+              "rounded-t-3xl",
+              "bg-gradient-to-b from-purple-500/10 to-transparent dark:from-purple-300/10",
+              "overflow-hidden"
+            )}
+          >
+            <div className="pointer-events-none absolute -top-10 left-1/2 h-32 w-[520px] -translate-x-1/2 rounded-full bg-purple-500/15 blur-3xl dark:bg-purple-300/10" />
+            <div className="pointer-events-none absolute -bottom-16 right-[-60px] h-40 w-40 rounded-full bg-fuchsia-500/10 blur-3xl dark:bg-fuchsia-400/10" />
+
+            <div className="flex items-start justify-between gap-3 relative">
               <div className="flex items-start gap-3">
-                <div className={cn(iconWrap, "h-11 w-11")}>
+                <div
+                  className={cn(
+                    "relative grid place-items-center h-12 w-12 rounded-2xl",
+                    "bg-purple-500/10 dark:bg-purple-300/10",
+                    "ring-1 ring-purple-500/30 dark:ring-purple-300/25",
+                    "shadow-[0_0_0_8px_rgba(139,92,246,0.10)] dark:shadow-[0_0_0_8px_rgba(196,181,253,0.10)]"
+                  )}
+                >
                   <Gauge className="h-6 w-6 text-purple-700 dark:text-purple-200" />
                 </div>
 
@@ -329,25 +352,40 @@ function ReviewDetailDialog({
                     </span>
 
                     {item.model ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-white">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/12 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-white">
                         <Bot className="h-3.5 w-3.5" />
                         {item.model}
                       </span>
                     ) : null}
+
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-900/5 px-2 py-0.5 text-[11px] text-slate-700 dark:bg-white/10 dark:text-white/80">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      AI 분석
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Body */}
           <div className="max-h-[74vh] overflow-y-auto px-6 py-5 space-y-5">
             <div>
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 원본 코드
               </div>
               {hasCode ? (
-                <pre className="max-h-[420px] overflow-auto rounded-xl bg-slate-950/90 px-4 py-3 text-[11px] leading-relaxed text-slate-50 dark:bg-black">
-                  <code className="whitespace-pre">{item.code}</code>
+                <pre
+                  className={cn(
+                    "max-h-[420px] overflow-auto rounded-2xl px-4 py-3",
+                    "bg-slate-950/95 text-slate-50 dark:bg-black",
+                    // ✅ 코드 영역도 프레임 맞춰서 링
+                    "shadow-[0_0_0_1px_rgba(139,92,246,0.22)] dark:shadow-[0_0_0_1px_rgba(196,181,253,0.18)]"
+                  )}
+                >
+                  <code className="whitespace-pre text-[11px] leading-relaxed">
+                    {item.code}
+                  </code>
                 </pre>
               ) : (
                 <p className="text-[11px] text-muted-foreground">
@@ -362,9 +400,16 @@ function ReviewDetailDialog({
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 리뷰 요약
               </div>
-              <p className="whitespace-pre-wrap leading-relaxed text-slate-800 dark:text-slate-100">
-                {item.summary}
-              </p>
+              <div
+                className={cn(
+                  "rounded-2xl p-4 bg-background/70",
+                  "shadow-[0_0_0_1px_rgba(148,163,184,0.35)] dark:shadow-[0_0_0_1px_rgba(148,163,184,0.45)]"
+                )}
+              >
+                <p className="whitespace-pre-wrap leading-relaxed text-slate-800 dark:text-slate-100 text-sm">
+                  {item.summary}
+                </p>
+              </div>
             </div>
 
             <SectionDivider />
@@ -378,7 +423,7 @@ function ReviewDetailDialog({
 }
 
 /* ===========================================================
-   🔹 Summary Card (detailed 모드에서 기본 노출)
+   🔹 Summary Card (항상 이걸로만 렌더)
 =========================================================== */
 
 function ReviewSummaryCard({
@@ -399,7 +444,10 @@ function ReviewSummaryCard({
         "rounded-2xl border border-slate-200 bg-white shadow-sm",
         "dark:border-white/15 dark:bg-slate-900/40",
         "transition-all duration-200",
-        "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/10",
+        "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/12",
+        // ✅ 카드 hover 시 보라 테두리 느낌 추가
+        "hover:shadow-[0_18px_50px_rgba(139,92,246,0.10)]",
+        "hover:border-purple-500/25 dark:hover:border-purple-300/20",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
       )}
     >
@@ -467,13 +515,10 @@ export default function Analyses() {
 
   const [sortBy, setSortBy] = React.useState<"latest" | "score">("latest");
   const [modelFilter, setModelFilter] = React.useState<string>("__all__");
-  const [viewMode, setViewMode] = React.useState<ViewMode>("detailed");
 
   // ✅ 상세 다이얼로그 상태
   const [openDetail, setOpenDetail] = React.useState(false);
   const [selected, setSelected] = React.useState<ReviewItem | null>(null);
-
-  /* ------------------------ 파생 데이터 ------------------------ */
 
   const allModels = React.useMemo(() => {
     const set = new Set<string>();
@@ -547,7 +592,7 @@ export default function Analyses() {
 
   return (
     <div className="pb-20 space-y-6">
-      {/* ✅ 상단: 타이틀 + 필터/정렬 */}
+      {/* 상단: 타이틀 + 필터/정렬 */}
       <Card className="overflow-hidden pt-0 dark:border-white/50">
         <BrandHeader
           icon={Bot}
@@ -594,10 +639,10 @@ export default function Analyses() {
             </div>
           }
         />
-        <CardContent className="pt-4">{/* 헤더에서 컨트롤 처리 */}</CardContent>
+        <CardContent className="pt-4" />
       </Card>
 
-      {/* ✅ 상단 요약 */}
+      {/* 상단 요약 */}
       {stats && (
         <Card className="overflow-hidden pt-0 dark:border-white/50">
           <BrandHeader
@@ -606,7 +651,6 @@ export default function Analyses() {
             subtitle="전체 리뷰 기준 요약 통계입니다."
           />
           <CardContent className="grid gap-4 md:grid-cols-4 pt-4">
-            {/* 총 리뷰 수 */}
             <div className={statCard}>
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500/10">
@@ -626,7 +670,6 @@ export default function Analyses() {
               </div>
             </div>
 
-            {/* 평균 Quality */}
             <div className={statCard}>
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500/10">
@@ -657,7 +700,6 @@ export default function Analyses() {
               </p>
             </div>
 
-            {/* 최고 점수 */}
             <div className={statCard}>
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500/10">
@@ -680,7 +722,6 @@ export default function Analyses() {
               </div>
             </div>
 
-            {/* 최저 점수 */}
             <div className={statCard}>
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500/10">
@@ -706,48 +747,12 @@ export default function Analyses() {
         </Card>
       )}
 
-      {/* ✅ 리스트 */}
+      {/* 리스트 (항상 자세히 보기) */}
       <Card className="overflow-hidden pt-0 dark:border-white/50">
         <BrandHeader
           icon={ListChecks}
           title="리뷰 목록"
-          subtitle="자세히 보기 / 요약 모아보기를 선택할 수 있어요."
-          right={
-            <div className="flex items-center gap-2">
-              <span className="hidden text-xs text-muted-foreground sm:inline">
-                보기 방식
-              </span>
-              <div className="inline-flex items-center gap-1 rounded-full bg-white/70 p-1 shadow-sm dark:bg-white/5">
-                <Button
-                  size="sm"
-                  variant={viewMode === "detailed" ? "default" : "ghost"}
-                  className={cn(
-                    "h-8 gap-1 rounded-full px-3 text-xs cursor-pointer",
-                    viewMode === "detailed" &&
-                      "bg-purple-600 text-white hover:bg-purple-700"
-                  )}
-                  onClick={() => setViewMode("detailed")}
-                >
-                  <ListChecks className="h-3.5 w-3.5" />
-                  <span>자세히</span>
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant={viewMode === "compact" ? "default" : "ghost"}
-                  className={cn(
-                    "h-8 gap-1 rounded-full px-3 text-xs cursor-pointer",
-                    viewMode === "compact" &&
-                      "bg-purple-600 text-white hover:bg-purple-700"
-                  )}
-                  onClick={() => setViewMode("compact")}
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                  <span>요약</span>
-                </Button>
-              </div>
-            </div>
-          }
+          subtitle="카드를 클릭하면 상세 다이얼로그가 열립니다."
         />
 
         <CardContent className="pt-4">
@@ -823,122 +828,19 @@ export default function Analyses() {
 
           {!isInitialLoading && filtered.length > 0 && (
             <>
-              <div
-                className={cn(
-                  "mt-2 grid gap-4",
-                  viewMode === "detailed"
-                    ? "md:grid-cols-2"
-                    : "sm:grid-cols-2 lg:grid-cols-3"
-                )}
-              >
-                {filtered.map((item) => {
-                  const hasCode =
-                    typeof item.code === "string" &&
-                    item.code.trim().length > 0;
-
-                  if (viewMode === "detailed") {
-                    return (
-                      <ReviewSummaryCard
-                        key={item.review_id}
-                        item={item}
-                        onClick={() => {
-                          setSelected(item);
-                          setOpenDetail(true);
-                        }}
-                      />
-                    );
-                  }
-
-                  const tone = qualityTone(item.quality_score);
-
-                  return (
-                    <Card
-                      key={item.review_id}
-                      className={cn(
-                        "overflow-hidden pt-0 border border-slate-200 bg-white shadow-sm",
-                        "dark:border-slate-800 dark:bg-slate-900/40"
-                      )}
-                    >
-                      <div className={brandHeader}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start gap-3">
-                            <div className={cn(iconWrap, "h-10 w-10")}>
-                              <Gauge className="h-5 w-5 text-purple-700 dark:text-purple-200" />
-                            </div>
-
-                            <div className="min-w-0">
-                              <div className="flex items-baseline gap-1">
-                                <span className="font-mono text-xl font-semibold text-slate-900 dark:text-white">
-                                  {item.quality_score}
-                                </span>
-                                <span className="text-[11px] text-muted-foreground">
-                                  /100
-                                </span>
-                                <span
-                                  className={cn(
-                                    "ml-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                                    tone.className
-                                  )}
-                                >
-                                  {tone.label}
-                                </span>
-                              </div>
-
-                              <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
-                                <Clock className="h-3 w-3 text-purple-600 dark:text-purple-300" />
-                                <span>{formatAudit(item.audit)}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {item.model && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-white">
-                              <Bot className="h-3.5 w-3.5" />
-                              {item.model}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <CardContent className="mt-1 max-h-72 space-y-3 overflow-y-auto p-3 text-xs">
-                        <div>
-                          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            원본 코드
-                          </div>
-                          {hasCode ? (
-                            <pre className="max-h-40 overflow-auto rounded-md bg-slate-950/90 px-2 py-1.5 text-[10px] leading-relaxed text-slate-50 dark:bg-black">
-                              <code className="whitespace-pre">
-                                {item.code}
-                              </code>
-                            </pre>
-                          ) : (
-                            <p className="text-[11px] text-muted-foreground">
-                              원본 코드가 없습니다.
-                            </p>
-                          )}
-                        </div>
-
-                        <SectionDivider />
-
-                        <div>
-                          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            리뷰 요약
-                          </div>
-                          <p className="line-clamp-3 leading-relaxed text-slate-800 dark:text-slate-100">
-                            {item.summary}
-                          </p>
-                        </div>
-
-                        <SectionDivider />
-
-                        <CategorySection item={item} />
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+              <div className="mt-2 grid gap-4 md:grid-cols-2">
+                {filtered.map((item) => (
+                  <ReviewSummaryCard
+                    key={item.review_id}
+                    item={item}
+                    onClick={() => {
+                      setSelected(item);
+                      setOpenDetail(true);
+                    }}
+                  />
+                ))}
               </div>
 
-              {/* ✅ 상세 다이얼로그 (한 번만 렌더) */}
               <ReviewDetailDialog
                 open={openDetail}
                 onOpenChange={(v) => {
