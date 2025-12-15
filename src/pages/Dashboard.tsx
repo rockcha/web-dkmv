@@ -1,7 +1,7 @@
 // src/pages/Dashboard.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import { useReviews } from "@/lib/useReviews";
 import type { CategoryKey } from "@/lib/useReviews";
@@ -36,11 +36,11 @@ import { cn } from "@/lib/utils";
 ========================= */
 
 const LINE_COLORS = {
-  total: "#8b5cf6", // 보라 - 총점
-  bug: "#f97316", // 주황 - Bug
-  maintainability: "#22c55e", // 초록 - Maintainability
-  style: "#0ea5e9", // 파랑 - Style
-  security: "#f43f5e", // 빨강 - Security
+  total: "#8b5cf6",
+  bug: "#f97316",
+  maintainability: "#22c55e",
+  style: "#0ea5e9",
+  security: "#f43f5e",
 } as const;
 
 type MetricKey = "total" | CategoryKey;
@@ -54,12 +54,7 @@ const METRIC_CONFIG: Record<
     color: string;
   }
 > = {
-  total: {
-    key: "total",
-    label: "총점",
-    icon: Gauge,
-    color: LINE_COLORS.total,
-  },
+  total: { key: "total", label: "총점", icon: Gauge, color: LINE_COLORS.total },
   bug: {
     key: "bug",
     label: "Bug",
@@ -111,7 +106,7 @@ function CustomTooltip({ active, payload }: any) {
   const item = payload[0].payload;
 
   return (
-    <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg ">
+    <div className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-100 shadow-lg">
       <div className="mb-1 text-[11px] text-slate-300">날짜: {item.date}</div>
       <div className="space-y-0.5">
         {payload.map((p: any) => (
@@ -132,6 +127,54 @@ function CustomTooltip({ active, payload }: any) {
 }
 
 /* =======================
+   Brand Header (미니 링 + 글로우)
+========================= */
+
+// ✅ 카드 헤더 공통 스타일 (배경 제거)
+const brandHeader =
+  "relative px-5 pt-5 pb-4 border-b border-slate-200/70 dark:border-white/10";
+
+// ✅ 아이콘 링 + 은은 글로우
+const iconWrap =
+  "relative grid place-items-center h-11 w-11 rounded-2xl " +
+  "ring-1 ring-purple-500/25 dark:ring-purple-300/25 " +
+  "bg-purple-500/5 dark:bg-purple-300/10 " +
+  "shadow-[0_0_0_6px_rgba(139,92,246,0.08)] dark:shadow-[0_0_0_6px_rgba(196,181,253,0.10)]";
+
+const iconGlyph = "h-6 w-6 text-purple-700 dark:text-purple-200";
+
+function MetricHeader({
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <CardHeader className={brandHeader}>
+      <div className="flex items-center gap-3">
+        <div className={iconWrap}>
+          <Icon className={iconGlyph} />
+        </div>
+
+        <div className="min-w-0">
+          <CardTitle className="text-[15px] font-extrabold tracking-tight text-slate-900 dark:text-white">
+            {title}
+          </CardTitle>
+          {subtitle ? (
+            <p className="mt-1 text-xs text-slate-600 dark:text-white/70 line-clamp-1">
+              {subtitle}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </CardHeader>
+  );
+}
+
+/* =======================
    Dashboard Page
 ========================= */
 export default function Dashboard() {
@@ -144,12 +187,8 @@ export default function Dashboard() {
     reload: load,
   } = useReviews();
 
-  // 🔹 그래프에서 어떤 메트릭을 볼지 선택 (총점 / 유형별)
   const [activeMetric, setActiveMetric] = useState<MetricKey>("total");
 
-  /* ------------ 상단 카드용 통계 ------------ */
-
-  /** 전체 평균 점수 (quality_score) */
   const avgScore = useMemo(() => {
     if (!myReviews.length) return null;
     const scores = myReviews.map((r) => r.quality_score);
@@ -157,10 +196,8 @@ export default function Dashboard() {
     return Math.round(avg);
   }, [myReviews]);
 
-  /** 총 리뷰 수 */
   const totalReviews = myReviews.length;
 
-  /** 향상률: 가장 예전 리뷰 vs 가장 최근 리뷰 */
   const improveRate = useMemo(() => {
     if (myReviews.length < 2) return "-";
 
@@ -168,8 +205,8 @@ export default function Dashboard() {
       (a, b) => new Date(a.audit).getTime() - new Date(b.audit).getTime()
     );
 
-    const first = sorted[0]?.quality_score ?? 0; // 가장 옛날
-    const last = sorted[sorted.length - 1]?.quality_score ?? 0; // 가장 최근
+    const first = sorted[0]?.quality_score ?? 0;
+    const last = sorted[sorted.length - 1]?.quality_score ?? 0;
 
     if (first === 0) return "-";
 
@@ -177,8 +214,6 @@ export default function Dashboard() {
     const rate = ((diff / first) * 100).toFixed(1);
     return `${diff >= 0 ? "+" : ""}${rate}%`;
   }, [myReviews]);
-
-  /* ------------ 점수 추이 그래프 데이터 (총점 + 유형별 점수) ------------ */
 
   const trendData = useMemo(() => {
     if (!myReviews.length) return [];
@@ -188,7 +223,7 @@ export default function Dashboard() {
     );
 
     return sorted.map((item, index) => ({
-      index: index + 1, // X축: 리뷰 순서
+      index: index + 1,
       date: formatAudit(item.audit),
       total: item.quality_score,
       bug: item.scores_by_category.bug,
@@ -198,15 +233,13 @@ export default function Dashboard() {
     }));
   }, [myReviews]);
 
-  /* ------------ 로그인 안 된 경우 ------------ */
-
   if (!isAuthenticated && !authLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <Card className="max-w-md border-dashed">
           <CardHeader className="flex flex-col items-center gap-2 text-center">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-500/10">
-              <Bot className="h-5 w-5 text-violet-500" />
+            <div className={cn(iconWrap, "h-10 w-10 rounded-full")}>
+              <Bot className="h-5 w-5 text-purple-600 dark:text-purple-200" />
             </div>
             <CardTitle className="text-lg">로그인이 필요합니다</CardTitle>
           </CardHeader>
@@ -225,9 +258,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 mt-6">
-      {/* 에러 표시 */}
       {error && (
-        <Card className="border-red-300 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40">
+        <Card className="border-red-300 bg-red-50 dark:border-red-900/60 dark:bg-red-950/40 ">
           <CardContent className="flex items-center justify-between gap-4 p-4 text-sm">
             <div className="flex items-start gap-2">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-500" />
@@ -249,23 +281,20 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* 상단 카드 영역 */}
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-3">
         {/* 평균 점수 */}
-        <Card className="relative overflow-hidden dark:border-white/50">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-violet-500/5 via-transparent to-violet-500/10 " />
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 ">
-            <CardTitle className="text-sm font-medium">평균 점수</CardTitle>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500/10">
-              <Gauge className="h-4 w-4 text-violet-500" />
-            </div>
-          </CardHeader>
+        <Card className="relative overflow-hidden dark:border-white/50 pt-0">
+          <MetricHeader
+            icon={Gauge}
+            title="평균 점수"
+            subtitle="최근 내 코드 리뷰 평균"
+          />
           <CardContent>
             {isInitialLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
               <>
-                <div className="text-3xl font-semibold text-violet-600 dark:text-violet-400">
+                <div className="text-3xl font-semibold text-purple-600 dark:text-purple-300">
                   {avgScore !== null ? avgScore : "-"}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -277,14 +306,12 @@ export default function Dashboard() {
         </Card>
 
         {/* 총 리뷰 수 */}
-        <Card className="relative overflow-hidden dark:border-white/50">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-slate-500/5 via-transparent to-slate-500/10" />
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">총 리뷰 수</CardTitle>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-500/10">
-              <ListChecks className="h-4 w-4 text-slate-600 dark:text-slate-200" />
-            </div>
-          </CardHeader>
+        <Card className="relative overflow-hidden dark:border-white/50 pt-0">
+          <MetricHeader
+            icon={ListChecks}
+            title="총 리뷰 수"
+            subtitle="요청한 전체 코드 리뷰"
+          />
           <CardContent>
             {isInitialLoading ? (
               <Skeleton className="h-8 w-20" />
@@ -302,14 +329,12 @@ export default function Dashboard() {
         </Card>
 
         {/* 향상률 */}
-        <Card className="relative overflow-hidden dark:border-white/50">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-emerald-500/5 via-transparent to-emerald-500/10" />
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">향상률</CardTitle>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-            </div>
-          </CardHeader>
+        <Card className="relative overflow-hidden dark:border-white/50 pt-0">
+          <MetricHeader
+            icon={TrendingUp}
+            title="향상률"
+            subtitle="첫 리뷰 대비 최근 변화"
+          />
           <CardContent>
             {isInitialLoading ? (
               <Skeleton className="h-8 w-24" />
@@ -336,71 +361,115 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* 점수 추이 그래프 (토글로 하나씩 보기) */}
-      <Card className="dark:border-white/50">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
-            <CardTitle>유형별 점수 변화 </CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">
-              선택한 지표 기준으로 리뷰 순서에 따른 점수 변화를 보여줘요.
-            </p>
+      {/* 점수 추이 그래프 */}
+      <Card className="dark:border-white/50 overflow-hidden pt-0">
+        <div className={brandHeader}>
+          <div className="flex flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={iconWrap}>
+                <Bot className={iconGlyph} />
+              </div>
+
+              <div className="min-w-0">
+                <div className="text-[15px] font-extrabold tracking-tight text-slate-900 dark:text-white">
+                  유형별 점수 변화
+                </div>
+                <p className="mt-1 text-xs text-slate-600 dark:text-white/70">
+                  선택한 지표 기준으로 리뷰 순서에 따른 점수 변화를 보여줘요.
+                </p>
+              </div>
+            </div>
+
+            {/* ✅ 토글 버튼 섹션: 다크에서도 비활성 가독성 보장 */}
+            <div className="rounded-xl bg-white/95 px-2 py-2 shadow-sm ring-1 ring-slate-200/70 dark:bg-slate-950/40 dark:ring-white/10">
+              <div className="flex flex-wrap justify-end gap-2">
+                {(
+                  Object.values(METRIC_CONFIG) as Array<
+                    (typeof METRIC_CONFIG)[MetricKey]
+                  >
+                ).map(({ key, label, icon: Icon, color }) => {
+                  const isActive = activeMetric === key;
+                  const activeBg = color;
+
+                  // ✅ 비활성: 라이트/다크 각각 가독성 확보
+                  const inactiveBgLight = `${color}22`;
+                  const inactiveTextLight = "#0f172a"; // slate-900
+                  const inactiveBorderLight = "rgba(15,23,42,0.18)";
+
+                  const inactiveBgDark = `${color}33`; // ← 기존 22보다 조금 더 진하게 (어두운 배경에서 떠보이게)
+                  const inactiveTextDark = "#E2E8F0"; // slate-200
+                  const inactiveBorderDark = "rgba(226,232,240,0.22)";
+
+                  return (
+                    <Button
+                      key={key}
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setActiveMetric(key)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all border shadow-sm",
+                        "dark:shadow-none",
+                        isActive
+                          ? "scale-[1.02]"
+                          : "opacity-95 hover:opacity-100 hover:scale-[1.01]",
+                        // ✅ 다크에서 비활성도 글자/아이콘이 보이게
+                        !isActive && "dark:text-slate-100"
+                      )}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: activeBg,
+                              borderColor: activeBg,
+                              color: "#ffffff",
+                            }
+                          : {
+                              // ✅ 핵심: 다크모드일 때 인라인 스타일도 분기
+                              backgroundColor:
+                                typeof window !== "undefined" &&
+                                document.documentElement.classList.contains(
+                                  "dark"
+                                )
+                                  ? inactiveBgDark
+                                  : inactiveBgLight,
+                              borderColor:
+                                typeof window !== "undefined" &&
+                                document.documentElement.classList.contains(
+                                  "dark"
+                                )
+                                  ? inactiveBorderDark
+                                  : inactiveBorderLight,
+                              color:
+                                typeof window !== "undefined" &&
+                                document.documentElement.classList.contains(
+                                  "dark"
+                                )
+                                  ? inactiveTextDark
+                                  : inactiveTextLight,
+                            }
+                      }
+                    >
+                      <Icon
+                        className="h-3.5 w-3.5"
+                        style={{
+                          color: isActive
+                            ? "#ffffff"
+                            : typeof window !== "undefined" &&
+                              document.documentElement.classList.contains(
+                                "dark"
+                              )
+                            ? inactiveTextDark
+                            : inactiveTextLight,
+                        }}
+                      />
+                      <span className="tracking-tight">{label}</span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-
-          {/* 🔹 메트릭 토글 배지 */}
-          <div className="flex flex-wrap justify-end gap-2">
-            {(
-              Object.values(METRIC_CONFIG) as Array<
-                (typeof METRIC_CONFIG)[MetricKey]
-              >
-            ).map(({ key, label, icon: Icon, color }) => {
-              const isActive = activeMetric === key;
-
-              // 살짝 채도만 낮춘 느낌을 위해 알파만 조절
-              const activeBg = color; // 풀 채도
-              const inactiveBg = `${color}33`; // 같은 색 + 낮은 알파 (약간 흐릿)
-
-              return (
-                <Button
-                  key={key}
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setActiveMetric(key)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all border",
-                    "cursor-pointer shadow-sm",
-                    isActive
-                      ? "scale-[1.02]"
-                      : "opacity-90 hover:opacity-100 hover:scale-[1.01]"
-                  )}
-                  style={
-                    isActive
-                      ? {
-                          backgroundColor: activeBg,
-                          borderColor: activeBg,
-                          color: "#ffffff",
-                        }
-                      : {
-                          // 같은 이미지 유지, 채도만 낮춘 느낌
-                          backgroundColor: inactiveBg,
-                          borderColor: `${color}80`,
-                          color: "#ffffffcc",
-                        }
-                  }
-                >
-                  {/* 점(네모) 제거하고 아이콘 + 텍스트만 */}
-                  <Icon
-                    className="h-3.5 w-3.5"
-                    style={{
-                      color: isActive ? "#ffffff" : "#ffffffdd",
-                    }}
-                  />
-                  <span className="tracking-tight">{label}</span>
-                </Button>
-              );
-            })}
-          </div>
-        </CardHeader>
+        </div>
 
         <CardContent className="h-72 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-400 scrollbar-track-transparent">
           {isInitialLoading ? (
@@ -431,7 +500,6 @@ export default function Dashboard() {
                   />
                   <Tooltip content={<CustomTooltip />} />
 
-                  {/* 🔹 선택한 메트릭만 하나 보여줌 */}
                   <Line
                     type="monotone"
                     dataKey={activeMetricConfig.key}

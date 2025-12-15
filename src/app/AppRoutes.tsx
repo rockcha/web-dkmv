@@ -7,6 +7,7 @@ import LoginPage from "@/pages/Login";
 
 import GithubCallbackPage from "@/pages/GithubCallbackPage";
 import { useAuth } from "@/features/auth/AuthContext";
+import DownloadPage from "@/pages/DownloadPage";
 
 // Lazy Pages
 const Landing = lazy(() => import("@/pages/Landing"));
@@ -95,6 +96,7 @@ export default function AppRoutes() {
           <Route path="/landing" element={<Landing />} />
           <Route path="/ui/reviews" element={<PostAuthRedirect />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/download" element={<DownloadPage />} />
 
           {/* 🔐 보호 라우트 */}
           <Route element={<RequireAuthLayout />}>

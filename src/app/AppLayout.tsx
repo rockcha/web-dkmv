@@ -35,10 +35,10 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/mypage/dashboard", label: "대시보드", icon: LayoutDashboard },
   { to: "/mypage/analyses", label: "분석 내역", icon: ListChecks },
   { to: "/mypage/compare", label: "모델 비교", icon: GitCompare },
-  { to: "/mypage/trends", label: "성장 추이", icon: LineChart },
+
   { to: "/mypage/leaderboard", label: "랭킹", icon: Trophy },
   { to: "/mypage/playground", label: "플레이그라운드", icon: FlaskConical },
-  { to: "/mypage/reports", label: "리포트", icon: FileBarChart },
+
   { to: "/mypage/settings", label: "설정", icon: SettingsIcon },
 ];
 
