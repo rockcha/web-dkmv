@@ -1,10 +1,21 @@
 // src/pages/Landing.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code2, Gauge, Monitor } from "lucide-react";
 import { TypingAnimation } from "@/components/ui/typing-animation";
 import DashboardTokenCta from "@/components/DashboardTokenCta";
-import { Highlighter } from "@/components/ui/highlighter"; // ✅ 경로 맞게
+
+import { annotate } from "rough-notation";
+import type { RoughAnnotation } from "rough-notation/lib/model";
+
+type AnnotationAction =
+  | "highlight"
+  | "underline"
+  | "box"
+  | "circle"
+  | "strike-through"
+  | "crossed-off"
+  | "bracket";
 
 const FLOW_STEPS = [
   { id: 1, label: "바이브 코딩", icon: Code2 },
@@ -16,26 +27,72 @@ const VIOLET_CHIP_CLASS =
   "rounded-md bg-violet-500/5 px-1.5 py-0.5 " +
   "text-violet-700 dark:text-violet-300";
 
-console.log("✅ Landing 렌더링 됨");
+const TITLE_ACTIONS: AnnotationAction[] = ["box", "underline", "circle"];
+
+/** ✅ 여기서만 “진짜 속도”를 컨트롤 */
+const TITLE_ANIM_MS = 3200; // <- 이걸 올리면 확실히 느려짐
+const TITLE_GAP_MS = 2700; // <- 애니 끝나고 쉬는 시간
+const TITLE_LOOP_MS = TITLE_ANIM_MS + TITLE_GAP_MS;
+
+/** ✅ 액션별 스타일 + 색 */
+function getAnnoConfig(action: AnnotationAction) {
+  switch (action) {
+    case "box":
+      return {
+        type: "box" as const,
+        color: "rgba(139,92,246,0.80)",
+        strokeWidth: 3,
+        padding: 8,
+        animationDuration: TITLE_ANIM_MS,
+        iterations: 1,
+      };
+    case "underline":
+      return {
+        type: "underline" as const,
+        color: "rgba(34,211,238,0.85)",
+        strokeWidth: 3.2,
+        padding: 2.2,
+        animationDuration: TITLE_ANIM_MS,
+        iterations: 1,
+      };
+    case "circle":
+      return {
+        type: "circle" as const,
+        color: "rgba(99,102,241,0.80)",
+        strokeWidth: 3.2,
+        padding: 15,
+        animationDuration: TITLE_ANIM_MS,
+        iterations: 1,
+      };
+    default:
+      return {
+        type: "underline" as const,
+        color: "rgba(34,211,238,0.85)",
+        strokeWidth: 2.2,
+        padding: 2,
+        animationDuration: TITLE_ANIM_MS,
+        iterations: 1,
+      };
+  }
+}
 
 export default function Landing() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [videoMode, setVideoMode] = useState<"extension" | "idle">("idle");
-
-  // 🔄 플로우 카드 뒤 보라색 글로우 순환 인덱스
   const [activeFlowGlow, setActiveFlowGlow] = useState(0);
 
-  // ✅ 하이라이트 시퀀스: 0(없음) → 1(box) → 2(circle) → 3(underline) → 0 반복
-  const [hlPhase, setHlPhase] = useState<0 | 1 | 2 | 3>(0);
-  // ✅ rough-notation은 "다시 그리기"가 필요해서 cycle로 remount 시킴
-  const [hlCycle, setHlCycle] = useState(0);
+  const titleRef = useRef<HTMLSpanElement | null>(null);
+  const annoRef = useRef<RoughAnnotation | null>(null);
+  const roRef = useRef<ResizeObserver | null>(null);
+
+  // ✅ resize 연타로 애니 재시작되는거 방지용
+  const resizeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setHasLoaded(true), 50);
     return () => clearTimeout(timer);
   }, []);
 
-  // 🔁 일정 주기로 Idle ↔ Extension 자동 전환
   useEffect(() => {
     const interval = setInterval(
       () => setVideoMode((prev) => (prev === "idle" ? "extension" : "idle")),
@@ -44,7 +101,6 @@ export default function Landing() {
     return () => clearInterval(interval);
   }, []);
 
-  // 🔁 플로우 카드 보라색 글로우 순차 순환
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveFlowGlow((prev) => (prev + 1) % FLOW_STEPS.length);
@@ -52,57 +108,83 @@ export default function Landing() {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ DKMV 타이틀 하이라이트 반복 시퀀스
   useEffect(() => {
     if (!hasLoaded) return;
 
+    const el = titleRef.current;
+    if (!el) return;
+
     let alive = true;
-    let t1: number | undefined;
-    let t2: number | undefined;
-    let t3: number | undefined;
-    let t4: number | undefined;
+    let idx = 0;
 
-    // 각 단계 시간(원하면 여기만 조절)
-    const d1 = 700; // box 그리는 시간/대기
-    const d2 = 700; // circle
-    const d3 = 650; // underline
-    const gap = 450; // 한 사이클 끝나고 쉬는 시간
-
-    const run = () => {
-      if (!alive) return;
-
-      setHlPhase(1); // box ON
-      t1 = window.setTimeout(() => {
-        if (!alive) return;
-        setHlPhase(2); // circle ON
-      }, d1);
-
-      t2 = window.setTimeout(() => {
-        if (!alive) return;
-        setHlPhase(3); // underline ON
-      }, d1 + d2);
-
-      t3 = window.setTimeout(() => {
-        if (!alive) return;
-        // 다 끝나면 꺼졌다가 cycle 증가로 다시 "그리기"
-        setHlPhase(0);
-        setHlCycle((c) => c + 1);
-      }, d1 + d2 + d3);
-
-      t4 = window.setTimeout(() => {
-        if (!alive) return;
-        run(); // 반복
-      }, d1 + d2 + d3 + gap);
+    const clearOne = () => {
+      try {
+        annoRef.current?.hide();
+        annoRef.current?.remove();
+      } catch {
+        // ignore
+      } finally {
+        annoRef.current = null;
+      }
     };
 
-    run();
+    const playOnce = () => {
+      if (!alive) return;
+
+      clearOne();
+
+      const action = TITLE_ACTIONS[idx % TITLE_ACTIONS.length];
+      idx += 1;
+
+      const a = annotate(el, getAnnoConfig(action));
+      annoRef.current = a;
+
+      requestAnimationFrame(() => {
+        if (!alive) return;
+        try {
+          a.show();
+        } catch {
+          // ignore
+        }
+      });
+    };
+
+    // 최초
+    playOnce();
+
+    // ✅ animationDuration보다 “항상” 길게: 그래야 진짜 느리게 보임
+    const interval = window.setInterval(playOnce, TITLE_LOOP_MS);
+
+    // ✅ resize는 디바운스해서 “가끔만” 다시 그리기
+    roRef.current?.disconnect();
+    roRef.current = new ResizeObserver(() => {
+      if (!alive) return;
+
+      if (resizeTimerRef.current) window.clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = window.setTimeout(() => {
+        if (!alive) return;
+        try {
+          annoRef.current?.hide();
+          annoRef.current?.show();
+        } catch {
+          playOnce();
+        }
+      }, 250);
+    });
+
+    roRef.current.observe(el);
 
     return () => {
       alive = false;
-      if (t1) window.clearTimeout(t1);
-      if (t2) window.clearTimeout(t2);
-      if (t3) window.clearTimeout(t3);
-      if (t4) window.clearTimeout(t4);
+      window.clearInterval(interval);
+
+      if (resizeTimerRef.current) window.clearTimeout(resizeTimerRef.current);
+      resizeTimerRef.current = null;
+
+      roRef.current?.disconnect();
+      roRef.current = null;
+
+      clearOne();
     };
   }, [hasLoaded]);
 
@@ -123,28 +205,13 @@ export default function Landing() {
         }
       `}</style>
 
-      <div
-        className="
-          flex h-full flex-col
-          bg-white text-slate-900
-          dark:bg-slate-950 dark:text-slate-100
-        "
-      >
-        <div
-          className="
-            relative flex flex-1 flex-col lg:flex-row
-            overflow-hidden
-            border-b border-slate-200 dark:border-slate-800
-            bg-gradient-to-b from-slate-50 via-white to-slate-50
-            dark:from-slate-950 dark:via-slate-950 dark:to-slate-900
-          "
-        >
+      <div className="flex h-full flex-col bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        <div className="relative flex flex-1 flex-col lg:flex-row overflow-hidden border-b border-slate-200 dark:border-slate-800 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
           <div className="pointer-events-none absolute inset-0 -z-10 opacity-60">
             <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full blur-3xl bg-violet-300/40 dark:bg-violet-500/25" />
             <div className="absolute -bottom-20 -right-20 h-72 w-72 rounded-full blur-3xl bg-cyan-300/40 dark:bg-cyan-500/20" />
           </div>
 
-          {/* ====== 왼쪽 ====== */}
           <section
             className={`
               flex-1 flex items-center
@@ -155,52 +222,11 @@ export default function Landing() {
           >
             <div className="mx-auto w-full max-w-3xl flex flex-col items-center">
               <div className="max-w-xl text-center">
-                <h1
-                  className="
-                    mt-4 inline-flex items-center justify-center gap-3 sm:gap-4
-                    text-4xl font-extrabold tracking-tight sm:text-5xl
-                    lg:justify-start
-                  "
-                >
+                <h1 className="mt-4 inline-flex items-center justify-center gap-3 sm:gap-4 text-4xl font-extrabold tracking-tight sm:text-5xl lg:justify-start">
                   <span className="flex items-center gap-3">
-                    {/* ✅ 반복 시퀀스: enabled로 단계별 on/off + cycle로 다시 그리기 */}
-                    <Highlighter
-                      key={`box-${hlCycle}`}
-                      action="box"
-                      color="rgba(139,92,246,0.75)"
-                      strokeWidth={2}
-                      padding={6}
-                      animationDuration={650}
-                      iterations={1}
-                      enabled={hlPhase >= 1}
-                      isView={false}
-                    >
-                      <Highlighter
-                        key={`circle-${hlCycle}`}
-                        action="circle"
-                        color="rgba(34,211,238,0.75)"
-                        strokeWidth={2}
-                        padding={8}
-                        animationDuration={1250}
-                        iterations={1}
-                        enabled={hlPhase >= 2}
-                        isView={false}
-                      >
-                        <Highlighter
-                          key={`underline-${hlCycle}`}
-                          action="underline"
-                          color="rgba(139,92,246,0.85)"
-                          strokeWidth={2.2}
-                          padding={2}
-                          animationDuration={1200}
-                          iterations={1}
-                          enabled={hlPhase >= 3}
-                          isView={false}
-                        >
-                          Don’t Kill My Vibe
-                        </Highlighter>
-                      </Highlighter>
-                    </Highlighter>
+                    <span ref={titleRef} className="relative inline-block">
+                      Don’t Kill My Vibe
+                    </span>
 
                     <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/50 bg-violet-500/10 px-2 py-0.5 text-[0.65rem] font-semibold text-violet-700 dark:text-violet-200">
                       Beta
@@ -245,40 +271,14 @@ export default function Landing() {
                               ${isActiveGlow ? "opacity-80" : "opacity-0"}
                             `}
                           />
-                          <Card
-                            className="
-                              relative
-                              group flex min-h-[96px] flex-col justify-between
-                              rounded-2xl border border-violet-200/80
-                              bg-white/80
-                              text-xs sm:text-sm shadow-sm
-                              dark:border-violet-400/50
-                              dark:bg-slate-900/70
-                              backdrop-blur
-                              transform-gpu transition-all duration-200
-                              hover:-translate-y-1 hover:scale-[1.01] hover:shadow-lg
-                            "
-                          >
+                          <Card className="relative group flex min-h-[96px] flex-col justify-between rounded-2xl border border-violet-200/80 bg-white/80 text-xs sm:text-sm shadow-sm dark:border-violet-400/50 dark:bg-slate-900/70 backdrop-blur transform-gpu transition-all duration-200 hover:-translate-y-1 hover:scale-[1.01] hover:shadow-lg">
                             <CardHeader className="flex flex-col gap-2 pb-3">
                               <div className="flex flex-row items-center gap-1">
-                                <div
-                                  className="
-                                    flex h-10 w-10 items-center justify-center rounded-2xl
-                                    transform-gpu transition-transform duration-200
-                                    group-hover:-translate-y-0.5
-                                  "
-                                >
+                                <div className="flex h-10 w-10 items-center justify-center rounded-2xl transform-gpu transition-transform duration-200 group-hover:-translate-y-0.5">
                                   <Icon className="size-7 text-violet-500" />
                                 </div>
                                 <div className="flex flex-col">
-                                  <CardTitle
-                                    className="
-                                      text-[0.8rem] sm:text-sm
-                                      font-semibold
-                                      text-slate-800 dark:text-slate-50
-                                      whitespace-nowrap
-                                    "
-                                  >
+                                  <CardTitle className="text-[0.8rem] sm:text-sm font-semibold text-slate-800 dark:text-slate-50 whitespace-nowrap">
                                     {step.label}
                                   </CardTitle>
                                 </div>
@@ -326,15 +326,7 @@ export default function Landing() {
             </div>
           </section>
 
-          {/* ====== 오른쪽 ====== */}
-          <aside
-            className="
-              flex-1 relative
-              border-t border-slate-200 lg:border-t-0 lg:border-l
-              border-slate-200 dark:border-slate-800
-              min-h-[260px]
-            "
-          >
+          <aside className="flex-1 relative border-t border-slate-200 lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 min-h-[260px]">
             <div className="pointer-events-none absolute inset-y-0 -left-[1px] z-20 hidden lg:block">
               <div
                 className="h-full w-[2px] rounded-full"
