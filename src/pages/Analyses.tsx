@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 import { Dialog } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { cn } from "@/lib/utils";
 import {
@@ -64,6 +65,17 @@ const CATEGORY_ICONS: Record<CategoryKey, React.ComponentType<any>> = {
   style: Palette,
   security: ShieldCheck,
 };
+
+/* ===========================================================
+   🔹 Skeleton (Dark 개선: Purple 톤)
+=========================================================== */
+
+const SKELETON_BASE =
+  "bg-slate-200/70 dark:bg-purple-300/15 ring-1 ring-slate-200/50 dark:ring-purple-300/15";
+
+function PurpleSkeleton({ className }: { className?: string }) {
+  return <Skeleton className={cn(SKELETON_BASE, className)} />;
+}
 
 /* ===========================================================
    🔹 공통 Brand Header
@@ -264,16 +276,13 @@ function ReviewDetailDialog({
             "fixed left-1/2 top-1/2 z-[60] w-[96vw] max-w-5xl -translate-x-1/2 -translate-y-1/2",
             "pointer-events-auto",
             "rounded-3xl bg-background",
-            // ✅ 프레임: 보라 링 + 소프트 글로우 강화
             "border border-purple-500/35 dark:border-purple-300/30",
             "shadow-[0_28px_90px_rgba(0,0,0,0.65)]",
             "ring-1 ring-purple-500/25 dark:ring-purple-300/20",
-            // ✅ 바깥 글로우(보라) — 튀지 않게 다층
             "before:pointer-events-none before:content-[''] before:absolute before:inset-0 before:rounded-3xl",
             "before:shadow-[0_0_0_2px_rgba(139,92,246,0.20),0_0_40px_rgba(139,92,246,0.22)]",
             "dark:before:shadow-[0_0_0_2px_rgba(196,181,253,0.16),0_0_44px_rgba(196,181,253,0.20)]",
             "focus-visible:outline-none",
-            // Motion
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
             "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
@@ -290,7 +299,6 @@ function ReviewDetailDialog({
               "dark:bg-white/10 dark:hover:bg-white/15",
               "ring-1 ring-slate-200/70 dark:ring-white/10",
               "transition cursor-pointer pointer-events-auto",
-              // ✅ close도 은은한 보라 포커스
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/70"
             )}
             aria-label="Close"
@@ -298,7 +306,7 @@ function ReviewDetailDialog({
             <X className="h-4 w-4 text-slate-700 dark:text-white/80 cursor-pointer" />
           </DialogPrimitive.Close>
 
-          {/* 헤더: 살짝 그라데이션 + 상단 하이라이트 */}
+          {/* 헤더 */}
           <div
             className={cn(
               "relative px-6 pt-6 pb-5 border-b",
@@ -379,7 +387,6 @@ function ReviewDetailDialog({
                   className={cn(
                     "max-h-[420px] overflow-auto rounded-2xl px-4 py-3",
                     "bg-slate-950/95 text-slate-50 dark:bg-black",
-                    // ✅ 코드 영역도 프레임 맞춰서 링
                     "shadow-[0_0_0_1px_rgba(139,92,246,0.22)] dark:shadow-[0_0_0_1px_rgba(196,181,253,0.18)]"
                   )}
                 >
@@ -445,7 +452,6 @@ function ReviewSummaryCard({
         "dark:border-white/15 dark:bg-slate-900/40",
         "transition-all duration-200",
         "hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-500/12",
-        // ✅ 카드 hover 시 보라 테두리 느낌 추가
         "hover:shadow-[0_18px_50px_rgba(139,92,246,0.10)]",
         "hover:border-purple-500/25 dark:hover:border-purple-300/20",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
@@ -496,6 +502,44 @@ function ReviewSummaryCard({
         </p>
       </div>
     </button>
+  );
+}
+
+/* ===========================================================
+   🔹 Loading Card Skeleton (Analyses 전용)
+=========================================================== */
+
+function ReviewCardSkeleton() {
+  return (
+    <Card className="pt-0 overflow-hidden dark:border-white/15">
+      <div className={brandHeader}>
+        <div className="flex items-center gap-3">
+          <div className={cn(iconWrap, "h-10 w-10")}>
+            <PurpleSkeleton className="h-4 w-4 rounded-md" />
+          </div>
+
+          {/* 제목 라인: 기존 w-40 + h-6 이 애매해서 살짝 정리 */}
+          <div className="min-w-0 flex-1">
+            <PurpleSkeleton className="h-5 w-44 rounded-lg" />
+            <div className="mt-2 flex items-center gap-2">
+              <PurpleSkeleton className="h-3 w-24 rounded-md" />
+              <PurpleSkeleton className="h-3 w-16 rounded-md" />
+            </div>
+          </div>
+
+          {/* 우측 모델 뱃지 자리 느낌 */}
+          <PurpleSkeleton className="h-6 w-20 rounded-full" />
+        </div>
+      </div>
+
+      <CardContent className="space-y-3 p-4">
+        <PurpleSkeleton className="h-3 w-full rounded-md" />
+        <PurpleSkeleton className="h-3 w-5/6 rounded-md" />
+        <PurpleSkeleton className="h-3 w-2/3 rounded-md" />
+        {/* summary 영역: 기존 h-20은 카드 높이 대비 조금 작아서 살짝 키움 */}
+        <PurpleSkeleton className="h-24 w-full rounded-xl" />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -780,24 +824,11 @@ export default function Analyses() {
             </Card>
           )}
 
+          {/* ✅ 로딩 스켈레톤: 다크에서도 퍼플톤으로 또렷하게 */}
           {isInitialLoading && (
             <div className="grid gap-4 md:grid-cols-2">
               {Array.from({ length: 4 }).map((_, idx) => (
-                <Card key={idx} className="pt-0 overflow-hidden">
-                  <div className={brandHeader}>
-                    <div className="flex items-center gap-3">
-                      <div className={cn(iconWrap, "h-10 w-10")}>
-                        <div className="h-4 w-4 rounded bg-purple-500/20" />
-                      </div>
-                      <div className="h-6 w-40 animate-pulse rounded bg-slate-200 dark:bg-white/10" />
-                    </div>
-                  </div>
-                  <CardContent className="space-y-3 p-4">
-                    <div className="h-3 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-                    <div className="h-3 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-                    <div className="h-20 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
-                  </CardContent>
-                </Card>
+                <ReviewCardSkeleton key={idx} />
               ))}
             </div>
           )}

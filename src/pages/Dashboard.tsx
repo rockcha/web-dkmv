@@ -98,6 +98,17 @@ function formatAudit(audit: string) {
 }
 
 /* =======================
+   Skeleton (Dark 개선: Purple 톤)
+========================= */
+
+const SKELETON_BASE =
+  "bg-slate-200/70 dark:bg-purple-300/15 ring-1 ring-slate-200/50 dark:ring-purple-300/15";
+
+function DashSkeleton({ className }: { className?: string }) {
+  return <Skeleton className={cn(SKELETON_BASE, className)} />;
+}
+
+/* =======================
    Custom Tooltip Component
 ========================= */
 function CustomTooltip({ active, payload }: any) {
@@ -291,7 +302,7 @@ export default function Dashboard() {
           />
           <CardContent>
             {isInitialLoading ? (
-              <Skeleton className="h-8 w-20" />
+              <DashSkeleton className="h-9 w-24 rounded-lg" />
             ) : (
               <>
                 <div className="text-3xl font-semibold text-purple-600 dark:text-purple-300">
@@ -314,7 +325,7 @@ export default function Dashboard() {
           />
           <CardContent>
             {isInitialLoading ? (
-              <Skeleton className="h-8 w-20" />
+              <DashSkeleton className="h-9 w-24 rounded-lg" />
             ) : (
               <>
                 <div className="text-3xl font-semibold text-slate-800 dark:text-slate-100">
@@ -337,7 +348,8 @@ export default function Dashboard() {
           />
           <CardContent>
             {isInitialLoading ? (
-              <Skeleton className="h-8 w-24" />
+              // 기존 h-8 w-24가 텍스트(작은 한 줄) 느낌이 안 맞아서 살짝 낮춤
+              <DashSkeleton className="h-7 w-28 rounded-lg" />
             ) : (
               <>
                 <div
@@ -396,7 +408,7 @@ export default function Dashboard() {
                   const inactiveTextLight = "#0f172a"; // slate-900
                   const inactiveBorderLight = "rgba(15,23,42,0.18)";
 
-                  const inactiveBgDark = `${color}33`; // ← 기존 22보다 조금 더 진하게 (어두운 배경에서 떠보이게)
+                  const inactiveBgDark = `${color}33`;
                   const inactiveTextDark = "#E2E8F0"; // slate-200
                   const inactiveBorderDark = "rgba(226,232,240,0.22)";
 
@@ -413,7 +425,6 @@ export default function Dashboard() {
                         isActive
                           ? "scale-[1.02]"
                           : "opacity-95 hover:opacity-100 hover:scale-[1.01]",
-                        // ✅ 다크에서 비활성도 글자/아이콘이 보이게
                         !isActive && "dark:text-slate-100"
                       )}
                       style={
@@ -424,7 +435,6 @@ export default function Dashboard() {
                               color: "#ffffff",
                             }
                           : {
-                              // ✅ 핵심: 다크모드일 때 인라인 스타일도 분기
                               backgroundColor:
                                 typeof window !== "undefined" &&
                                 document.documentElement.classList.contains(
@@ -474,7 +484,8 @@ export default function Dashboard() {
         <CardContent className="h-72 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-400 scrollbar-track-transparent">
           {isInitialLoading ? (
             <div className="flex h-full items-center justify-center">
-              <Skeleton className="h-40 w-full" />
+              {/* h-40가 살짝 작아 보여서 컨테이너( h-72 )에 맞게 키움 */}
+              <DashSkeleton className="h-52 w-full rounded-xl" />
             </div>
           ) : trendData.length === 0 ? (
             <div className="grid h-full place-items-center text-sm text-slate-400">

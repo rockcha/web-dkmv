@@ -5,6 +5,7 @@ export type ModelOption = {
 };
 
 const RAW_MODEL_IDS: string[] = [
+  "no-model/null",
   "google/gemini-3-pro-image-preview",
   "x-ai/grok-4.1-fast",
   "x-ai/grok-4.1-fast:free",

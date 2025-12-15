@@ -22,6 +22,7 @@ const Reports = lazy(() => import("@/pages/Reports"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const PostAuthRedirect = lazy(() => import("@/pages/PostAuthRedirect"));
+const About = lazy(() => import("@/pages/About"));
 
 /*───────────────────────────────
   🔐 로그인 필수 보호 레이아웃
@@ -97,6 +98,7 @@ export default function AppRoutes() {
           <Route path="/ui/reviews" element={<PostAuthRedirect />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/download" element={<DownloadPage />} />
+          <Route path="/about" element={<About />} />
 
           {/* 🔐 보호 라우트 */}
           <Route element={<RequireAuthLayout />}>

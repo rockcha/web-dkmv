@@ -1,12 +1,14 @@
 // src/layouts/AppHeader.tsx
-import { useEffect, useState, Fragment } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState, Fragment } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Home, Info, DownloadCloud, LayoutDashboard } from "lucide-react";
 
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { AuthMenu } from "@/features/auth/AuthMenu";
 import { useAuth } from "@/features/auth/AuthContext";
 import { toast } from "sonner";
+
+import { pickHeaderLogo } from "@/constants/headerLogo";
 
 const NAV_ITEMS = [
   { label: "홈", labelEn: "Home", to: "/", icon: Home },
@@ -29,12 +31,21 @@ const NAV_ITEMS = [
 export default function AppHeader() {
   const [mounted, setMounted] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     const timer = setTimeout(() => setMounted(true), 30);
     return () => clearTimeout(timer);
   }, []);
+
+  /** ✅ 경로에 따른 헤더 로고 선택 */
+  const headerLogoSrc = useMemo(() => pickHeaderLogo(pathname), [pathname]);
+
+  /** ✅ 로고 클릭 시: 마이페이지면 대시보드, 아니면 랜딩 */
+  const logoLinkTo = useMemo(() => {
+    return pathname.startsWith("/mypage") ? "/mypage/dashboard" : "/";
+  }, [pathname]);
 
   return (
     <header
@@ -57,11 +68,11 @@ export default function AppHeader() {
         style={{ transitionDelay: mounted ? "60ms" : "0ms" }}
       >
         <Link
-          to="/dashboard"
+          to={logoLinkTo}
           className="inline-flex items-center gap-2 select-none"
         >
           <img
-            src="/logo3d.png"
+            src={headerLogoSrc}
             alt="DKMV"
             width={24}
             height={24}
