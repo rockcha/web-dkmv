@@ -1,7 +1,7 @@
 // src/layouts/AppHeader.tsx
 import { useEffect, useMemo, useState, Fragment } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Home, Info, DownloadCloud, LayoutDashboard } from "lucide-react";
+import { Home, Info, Rocket, LayoutDashboard } from "lucide-react";
 
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { AuthMenu } from "@/features/auth/AuthMenu";
@@ -14,10 +14,10 @@ const NAV_ITEMS = [
   { label: "홈", labelEn: "Home", to: "/", icon: Home },
   { label: "DKMV란?", labelEn: "About", to: "/about", icon: Info },
   {
-    label: "다운로드",
-    labelEn: "Download",
-    to: "/download",
-    icon: DownloadCloud,
+    label: "시작하기",
+    labelEn: "Get Started",
+    to: "/start",
+    icon: Rocket,
   },
   {
     label: "대시보드",

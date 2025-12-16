@@ -78,7 +78,6 @@ function getAnnoConfig(action: AnnotationAction) {
 
 export default function Landing() {
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [videoMode, setVideoMode] = useState<"extension" | "idle">("idle");
   const [activeFlowGlow, setActiveFlowGlow] = useState(0);
 
   const titleRef = useRef<HTMLSpanElement | null>(null);
@@ -88,17 +87,54 @@ export default function Landing() {
   // ✅ resize 연타로 애니 재시작되는거 방지용
   const resizeTimerRef = useRef<number | null>(null);
 
+  // ✅ Video playlist: “끝나면 다음 영상”
+  const PLAYLIST = [
+    {
+      key: "idle",
+      label: "DKMV Idle 화면",
+      src: "/hero-video.mp4",
+      caption: (
+        <>
+          DKMV Idle 화면에서 전체적인{" "}
+          <span className="font-semibold">분석 흐름</span>과{" "}
+          <span className="font-semibold">바이브 점수</span>를 확인할 수
+          있습니다.
+        </>
+      ),
+    },
+    {
+      key: "extension",
+      label: "VSCode 익스텐션 실사용 화면",
+      src: "/extension-video.mp4",
+      caption: (
+        <>
+          에디터에서 선택한 코드만 전송해{" "}
+          <span className="font-semibold">실시간 품질 점수와 상세 피드백</span>
+          을 받아볼 수 있습니다.
+        </>
+      ),
+    },
+  ] as const;
+
+  const [videoIdx, setVideoIdx] = useState(0);
+  const [isVideoFading, setIsVideoFading] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const currentVideo = PLAYLIST[videoIdx];
+
+  const handleVideoEnded = () => {
+    // ✅ 영상이 “끝나면” 다음 것으로
+    setIsVideoFading(true);
+
+    window.setTimeout(() => {
+      setVideoIdx((prev) => (prev + 1) % PLAYLIST.length);
+      setIsVideoFading(false);
+    }, 250);
+  };
+
   useEffect(() => {
     const timer = setTimeout(() => setHasLoaded(true), 50);
     return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(
-      () => setVideoMode((prev) => (prev === "idle" ? "extension" : "idle")),
-      10000
-    );
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -191,9 +227,6 @@ export default function Landing() {
   const fadeClass = hasLoaded
     ? "opacity-100 translate-y-0"
     : "opacity-0 translate-y-4";
-
-  const isExtensionMode = videoMode === "extension";
-  const isIdleMode = videoMode === "idle";
 
   return (
     <>
@@ -326,6 +359,7 @@ export default function Landing() {
             </div>
           </section>
 
+          {/* ✅ 영상: 끝나면 다음 영상으로 */}
           <aside className="flex-1 relative border-t border-slate-200 lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 min-h-[260px]">
             <div className="pointer-events-none absolute inset-y-0 -left-[1px] z-20 hidden lg:block">
               <div
@@ -341,59 +375,29 @@ export default function Landing() {
 
             <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-lg bg-black/65 px-3 py-1 text-[0.7rem] font-medium text-slate-100">
               <Monitor className="size-3.5" />
-              {isExtensionMode
-                ? "VSCode 익스텐션 실사용 화면"
-                : "DKMV Idle 화면"}
+              {currentVideo.label}
             </div>
 
             <video
+              key={currentVideo.src} // ✅ src 바뀌면 확실히 새로 로드
+              ref={videoRef}
               className={`
                 absolute inset-0 h-full w-full object-cover
-                transition-opacity duration-700
-                ${isIdleMode ? "opacity-100" : "opacity-0"}
+                transition-opacity duration-300
+                ${isVideoFading ? "opacity-0" : "opacity-100"}
               `}
               autoPlay
               muted
-              loop
               playsInline
-              src="/hero-video.mp4"
-            >
-              브라우저에서 HTML5 비디오를 지원하지 않습니다.
-            </video>
-
-            <video
-              className={`
-                absolute inset-0 h-full w-full object-cover
-                transition-opacity duration-700
-                ${isExtensionMode ? "opacity-100" : "opacity-0"}
-              `}
-              autoPlay
-              muted
-              loop
-              playsInline
-              src="/extension-video.mp4"
+              src={currentVideo.src}
+              onEnded={handleVideoEnded}
             >
               브라우저에서 HTML5 비디오를 지원하지 않습니다.
             </video>
 
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-4 py-4">
               <p className="text-xs sm:text-sm text-slate-100">
-                {isExtensionMode ? (
-                  <>
-                    에디터에서 선택한 코드만 전송해{" "}
-                    <span className="font-semibold">
-                      실시간 품질 점수와 상세 피드백
-                    </span>
-                    을 받아볼 수 있습니다.
-                  </>
-                ) : (
-                  <>
-                    DKMV Idle 화면에서 전체적인{" "}
-                    <span className="font-semibold">분석 흐름</span>과{" "}
-                    <span className="font-semibold">바이브 점수</span>를 확인할
-                    수 있습니다.
-                  </>
-                )}
+                {currentVideo.caption}
               </p>
             </div>
           </aside>

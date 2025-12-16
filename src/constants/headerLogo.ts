@@ -24,7 +24,7 @@ export const HEADER_LOGO_RULES: HeaderLogoRule[] = [
   { prefix: "/mypage/settings", src: "/images/settings.png" },
 
   // public pages
-  { prefix: "/download", src: "/images/download.png" },
+  { prefix: "/start", src: "/images/download.png" },
   { prefix: "/about", src: "/images/about.png" },
   { prefix: "/login", src: "/images/login.png" },
 ];

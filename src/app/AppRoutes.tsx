@@ -97,7 +97,7 @@ export default function AppRoutes() {
           <Route path="/landing" element={<Landing />} />
           <Route path="/ui/reviews" element={<PostAuthRedirect />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/download" element={<DownloadPage />} />
+          <Route path="/start" element={<DownloadPage />} />
           <Route path="/about" element={<About />} />
 
           {/* 🔐 보호 라우트 */}

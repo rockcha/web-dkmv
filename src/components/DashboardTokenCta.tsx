@@ -2,11 +2,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/AuthContext";
 import { mintVscodeToken } from "@/features/auth/authApi";
 import { toast } from "sonner";
-import { Rocket, ArrowRight, Copy, KeyRound } from "lucide-react";
+import { Rocket, ArrowRight, Copy, KeyRound, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +22,13 @@ type DashboardTokenCtaProps = {
   className?: string;
 };
 
+/** ✅ 토큰은 UI에는 짧게(마스킹) 표시하고, 복사는 원본 그대로 */
+const maskToken = (value: string, head = 12, tail = 10) => {
+  if (!value) return "";
+  if (value.length <= head + tail + 3) return value;
+  return `${value.slice(0, head)}…${value.slice(-tail)}`;
+};
+
 export default function DashboardTokenCta({
   className,
 }: DashboardTokenCtaProps) {
@@ -31,13 +37,11 @@ export default function DashboardTokenCta({
 
   const [hovered, setHovered] = useState<HoverTarget>(null);
 
-  // 토큰 발급 dialog 상태
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // 📏 flex 비율 (hover 시 부드럽게 변경)
   const baseGrow = 1;
   const expandedGrow = 1.35;
   const collapsedGrow = 0.65;
@@ -59,10 +63,8 @@ export default function DashboardTokenCta({
   const flexTransition =
     "flex-grow 260ms cubic-bezier(0.22,0.61,0.36,1), transform 260ms cubic-bezier(0.22,0.61,0.36,1)";
 
-  // 🪄 토큰 발급
   const handleMint = async () => {
     if (!isAuthenticated) {
-      // 👉 토큰 발급 시도 시 비로그인 → 로그인 페이지로 이동
       navigate("/login?from=token-required");
       return;
     }
@@ -91,14 +93,13 @@ export default function DashboardTokenCta({
       await navigator.clipboard.writeText(token);
       setCopied(true);
       toast.success("클립보드에 복사되었습니다.");
-      setTimeout(() => setCopied(false), 1500);
+      setTimeout(() => setCopied(false), 1200);
     } catch (e) {
       console.error(e);
       toast.error("복사에 실패했습니다. 직접 선택해서 복사해 주세요.");
     }
   };
 
-  // Dialog 열릴 때 로그인 여부 체크
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setOpen(false);
@@ -106,7 +107,6 @@ export default function DashboardTokenCta({
     }
 
     if (!isAuthenticated) {
-      // 👉 Dialog 열려고 해도 비로그인 상태면 로그인 페이지로 이동
       navigate("/login?from=token-required");
       return;
     }
@@ -114,7 +114,6 @@ export default function DashboardTokenCta({
     setOpen(true);
   };
 
-  // 🎨 공통 버튼 베이스 (색/그림자/hover/텍스트 애니메이션 동일)
   const baseButtonClass = [
     "group relative inline-flex h-16 w-full items-center justify-center overflow-hidden",
     "rounded-2xl border border-violet-500/70",
@@ -136,6 +135,28 @@ export default function DashboardTokenCta({
     baseButtonClass +
     (hovered === "token" ? "" : hovered === "dashboard" ? " opacity-90" : "");
 
+  /** ✅ 토큰 “input 박스” (버튼을 안에 넣기 위해 relative + pr 확보) */
+  const tokenBoxClass = [
+    "relative w-full max-w-full overflow-hidden", // ✅ 내부 absolute 버튼 기준
+    "rounded-2xl border px-3 py-2 pr-11", // ✅ 오른쪽 버튼 공간 확보 (pr-11)
+    "bg-slate-50/80 dark:bg-slate-900/60",
+    copied
+      ? "border-emerald-400/80 ring-2 ring-emerald-300/50 shadow-[0_0_0_3px_rgba(16,185,129,0.18)] dark:border-emerald-400/70 dark:ring-emerald-400/30"
+      : "border-slate-200/70 dark:border-slate-700/70",
+    "transition-[border-color,box-shadow] duration-200",
+  ].join(" ");
+
+  /** ✅ input 안쪽 오른쪽 복사 버튼 (hover + cursor-pointer 확실히) */
+  const copyInInputBtnClass = [
+    "absolute right-1.5 top-1/2 -translate-y-1/2",
+    "h-8 w-8 rounded-xl",
+    "cursor-pointer", // ✅ 기본도 pointer
+    "text-slate-600 hover:text-slate-900 hover:bg-slate-100",
+    "dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/70",
+    "disabled:cursor-not-allowed disabled:opacity-60",
+    "transition-colors",
+  ].join(" ");
+
   return (
     <div
       className={`
@@ -145,7 +166,7 @@ export default function DashboardTokenCta({
         ${className ?? ""}
       `}
     >
-      {/* 대시보드 버튼 래퍼 (flex 비율 애니메이션) */}
+      {/* 시작하기 */}
       <div
         style={{
           flexGrow: dashboardGrow,
@@ -158,36 +179,19 @@ export default function DashboardTokenCta({
         }
       >
         <Button asChild size="lg" className={dashboardButtonClass}>
-          <Link to="/mypage/dashboard" aria-label="DKMV 대시보드 시작하기">
+          <Link to="/start" aria-label="DKMV 시작하기">
             <span className="flex items-center gap-2">
-              <Rocket
-                className="
-                  size-5
-                  transition-transform duration-300
-                  group-hover:-translate-y-0.5 group-hover:translate-x-0.5
-                "
-              />
-              <span
-                className="
-                  transition-transform duration-300
-                  group-hover:-translate-y-0.5
-                "
-              >
-                대시보드로
+              <Rocket className="size-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              <span className="transition-transform duration-300 group-hover:-translate-y-0.5">
+                시작하기
               </span>
-              <ArrowRight
-                className="
-                  size-4 opacity-0 -translate-x-1
-                  transition-all duration-300
-                  group-hover:opacity-100 group-hover:translate-x-0
-                "
-              />
+              <ArrowRight className="size-4 opacity-0 -translate-x-1 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" />
             </span>
           </Link>
         </Button>
       </div>
 
-      {/* 토큰 발급 버튼 + Dialog */}
+      {/* 토큰 발급 */}
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <div
           style={{
@@ -203,37 +207,20 @@ export default function DashboardTokenCta({
           <DialogTrigger asChild>
             <Button type="button" size="lg" className={tokenButtonClass}>
               <span className="flex items-center gap-2">
-                <KeyRound
-                  className="
-                    size-5
-                    transition-transform duration-300
-                    group-hover:-translate-y-0.5 group-hover:translate-x-0.5
-                  "
-                />
-                <span
-                  className="
-                    transition-transform duration-300
-                    group-hover:-translate-y-0.5
-                  "
-                >
+                <KeyRound className="size-5 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                <span className="transition-transform duration-300 group-hover:-translate-y-0.5">
                   토큰 발급
                 </span>
-                <ArrowRight
-                  className="
-                    size-4 opacity-0 -translate-x-1
-                    transition-all duration-300
-                    group-hover:opacity-100 group-hover:translate-x-0
-                  "
-                />
+                <ArrowRight className="size-4 opacity-0 -translate-x-1 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" />
               </span>
             </Button>
           </DialogTrigger>
         </div>
 
-        {/* Dialog 내용 */}
         <DialogContent
           className="
             max-w-lg
+            overflow-hidden
             rounded-2xl
             border border-slate-200/80 bg-white/95
             backdrop-blur
@@ -247,22 +234,15 @@ export default function DashboardTokenCta({
               </span>
               <span>VS Code 확장용 토큰 발급</span>
             </DialogTitle>
+
             <DialogDescription className="text-xs sm:text-sm leading-relaxed">
-              웹에서 GitHub로 로그인한 뒤, VS Code 확장에서 사용할{" "}
+              확장 설정 화면에 붙여넣을{" "}
               <span className="font-semibold text-slate-700 dark:text-slate-100">
                 전용 액세스 토큰
               </span>
-              을 발급합니다. 이 토큰은 다른 사람에게 노출되지 않도록 주의해
-              주세요.
+              을 발급합니다. 외부 노출에 주의해 주세요.
             </DialogDescription>
           </DialogHeader>
-
-          {!isAuthenticated && (
-            <p className="mt-2 text-xs sm:text-sm text-red-500">
-              현재 로그인되어 있지 않습니다. 상단 메뉴에서 GitHub 로그인을
-              완료한 뒤 다시 시도해 주세요.
-            </p>
-          )}
 
           <div className="mt-4 space-y-4">
             <Button
@@ -278,46 +258,56 @@ export default function DashboardTokenCta({
               onClick={handleMint}
               disabled={isLoading}
             >
-              {isLoading ? "토큰 발급 중..." : "VS Code용 토큰 발급하기"}
+              {isLoading ? "발급 중..." : token ? "다시 발급" : "토큰 발급"}
             </Button>
 
             <div className="space-y-2">
               <label className="text-xs font-medium text-slate-600 dark:text-slate-300">
                 발급된 토큰
               </label>
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  value={token}
-                  readOnly
-                  className="
-                    text-[11px] sm:text-xs font-mono
-                    bg-slate-50/80 dark:bg-slate-900/70
-                  "
-                  placeholder="여기에 발급된 토큰이 표시됩니다."
-                />
+
+              {/* ✅ input(박스) 안 오른쪽에 복사 버튼 */}
+              <div className={tokenBoxClass} title={token || undefined}>
+                {/* 토큰 텍스트 (오른쪽 버튼 공간 pr-11로 확보됨) */}
+                {token ? (
+                  <span
+                    className="
+                      block w-full max-w-full truncate whitespace-nowrap
+                      font-mono text-[11px] sm:text-xs
+                      text-slate-700 dark:text-slate-200
+                    "
+                  >
+                    {maskToken(token, 12, 10)}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500 text-[11px] sm:text-xs">
+                    여기에 발급된 토큰이 표시됩니다.
+                  </span>
+                )}
+
+                {/* 복사 버튼 */}
                 <Button
                   type="button"
-                  className="
-                    shrink-0
-                    cursor-pointer
-                    text-[11px] sm:text-xs
-                  "
+                  variant="ghost"
+                  size="icon"
+                  className={copyInInputBtnClass}
                   onClick={handleCopy}
                   disabled={!token}
+                  aria-label="토큰 복사"
+                  title={token ? "복사" : "토큰이 없습니다"}
                 >
-                  <Copy className="mr-1 h-3.5 w-3.5" />
-                  {copied ? "복사됨" : "복사"}
+                  {copied ? (
+                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
+
               {token && (
                 <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  이 토큰은{" "}
-                  <span className="font-medium">
-                    VS Code DKMV 확장 설정 화면
-                  </span>
-                  에서만 사용하세요. GitHub 토큰처럼 민감한 값이므로
-                  저장소/스크린샷 등에 노출되지 않게 주의해 주세요.
+                  토큰은 민감한 값입니다. 저장소/스크린샷/공유에 노출되지 않게
+                  주의하세요.
                 </p>
               )}
             </div>
