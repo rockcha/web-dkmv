@@ -75,8 +75,6 @@ print(factorial(5))
 `,
 };
 
-type Phase = "idle" | "requesting" | "fetching" | "done" | "error";
-
 /** /v1/reviews/{review_id} 결과(서비스용으로 필요한 부분만) */
 type ScoresByCategory = {
   bug: number;
@@ -445,7 +443,6 @@ export default function Playground() {
     "";
   const [modelId, setModelId] = useState<string>(defaultModelId);
 
-  const [phase, setPhase] = useState<Phase>("idle");
   const [loading, setLoading] = useState(false);
   const [fixLoading, setFixLoading] = useState(false);
 
@@ -540,7 +537,6 @@ export default function Playground() {
       return;
     }
 
-    setPhase("requesting");
     setLoading(true);
     scrollToReview();
 
@@ -594,7 +590,6 @@ export default function Playground() {
       setLastReviewId(reviewId);
 
       // 2) GET detail
-      setPhase("fetching");
       const getUrl = `/api/v1/reviews/${reviewId}`;
       const getResp = await fetch(getUrl, {
         method: "GET",
@@ -611,14 +606,12 @@ export default function Playground() {
         const parsedGet = JSON.parse(getText) as ReviewDetailResponse;
         if (!parsedGet?.body) throw new Error();
         setReviewDetail(parsedGet);
-        setPhase("done");
       } catch {
         throw new Error("리뷰 결과 처리 중 문제가 발생했습니다.");
       }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         setError(e?.message ?? "요청 처리 중 문제가 발생했습니다.");
-        setPhase("error");
       }
     } finally {
       setLoading(false);
@@ -667,7 +660,7 @@ export default function Playground() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
     } catch {
-      // ignore: clipboard permission
+      // ignore
     }
   };
 
@@ -1092,7 +1085,7 @@ export default function Playground() {
             </div>
           )}
 
-          {/* ✅ 아무 것도 없을 때 (초기 진입 UX: 중앙 정렬 + 안내) */}
+          {/* ✅ 아무 것도 없을 때 */}
           {!loading && !body && (
             <div className="py-2">
               <EmptyState

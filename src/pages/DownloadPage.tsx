@@ -5,7 +5,6 @@ import {
   ShieldCheck,
   Monitor,
   Store,
-  PlayCircle,
   Sidebar,
   Command,
   Sparkles,

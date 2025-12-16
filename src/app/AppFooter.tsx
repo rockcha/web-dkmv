@@ -1,5 +1,5 @@
 // src/components/AppFooter.tsx
-import * as React from "react";
+
 import { Github, Mail, Globe } from "lucide-react";
 
 type Props = {
